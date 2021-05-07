@@ -1,0 +1,27 @@
+{
+  "name": "mrsombre/spring-challenge-2021",
+  "description": "",
+  "license": "MIT",
+  "require": {
+    "php": "^7.3|^8.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.5"
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests"
+    },
+    "exclude-from-classmap": [
+      "/tests/"
+    ]
+  },
+  "scripts": {
+    "test": "phpunit"
+  },
+  "config": {
+    "platform": {
+      "php": "7.3.9"
+    }
+  }
+}
