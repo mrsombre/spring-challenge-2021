@@ -10,7 +10,7 @@ use Throwable;
 
 function l($message)
 {
-    if ($_ENV['APP_ENV'] === 'test') {
+    if (isset($_ENV['APP_ENV']) && $_ENV['APP_ENV'] === 'test') {
         return;
     }
 
@@ -19,6 +19,73 @@ function l($message)
         return;
     }
     error_log(var_export($message, true));
+}
+
+final class Field
+{
+    /** @var \App\Cell[] */
+    public $cells;
+    /** @var int */
+    public $numberOfCells;
+
+    public static function fromStream($stream): self
+    {
+        fscanf($stream, '%d', $num);
+
+        $cells = [];
+        for ($i = 0; $i < $num; $i++) {
+            $cell = Cell::fromStream($stream);
+            $cells[$cell->index] = $cell;
+        }
+
+        return new self($cells);
+    }
+
+    /**
+     * @param \App\Cell[] $cells
+     */
+    public function __construct(array $cells)
+    {
+        $cellsIndexed = [];
+        foreach ($cells as $cell) {
+            $cellsIndexed[$cell->index] = $cell;
+        }
+        $this->cells = $cellsIndexed;
+        $this->numberOfCells = count($cells);
+    }
+
+    public function byIndex($index): Cell
+    {
+        return $this->cells[$index];
+    }
+
+    public function byTree(Tree $tree): Cell
+    {
+        return $this->byIndex($tree->cellIndex);
+    }
+}
+
+final class Cell
+{
+    /** @var int */
+    public $index;
+    /** @var int */
+    public $richness;
+    /** @var int[] */
+    public $neighs;
+
+    public static function fromStream($stream): self
+    {
+        $data = fscanf($stream, '%d %d %d %d %d %d %d %d');
+        return new self($data[0], $data[1], array_slice($data, 2));
+    }
+
+    public function __construct(int $index, int $richness, array $neighs)
+    {
+        $this->index = $index;
+        $this->richness = $richness;
+        $this->neighs = $neighs;
+    }
 }
 
 final class Game
@@ -164,52 +231,6 @@ final class Step
         }
         throw new InvalidArgumentException("Invalid size.");
     }
-}
-
-final class Field
-{
-    /** @var int */
-    public $numberOfCells;
-    /** @var \App\Cell[] */
-    public $cells = [];
-
-    public static function fromStream($stream): self
-    {
-        $field = new self();
-
-        fscanf($stream, '%d', $num);
-        for ($i = 0; $i < $num; $i++) {
-            $values = fscanf($stream, '%d %d %d %d %d %d %d %d');
-            $cell = new Cell();
-            $cell->index = $values[0];
-            $cell->richness = $values[1];
-            $cell->neighs = array_slice($values, 2);
-            $field->cells[$values[0]] = $cell;
-            $field->numberOfCells++;
-        }
-
-        return $field;
-    }
-
-    public function cell($index): Cell
-    {
-        return $this->cells[$index];
-    }
-
-    public function byTree(Tree $tree): Cell
-    {
-        return $this->cell($tree->cellIndex);
-    }
-}
-
-final class Cell
-{
-    /** @var int */
-    public $index;
-    /** @var int */
-    public $richness;
-    /** @var int */
-    public $neighs;
 }
 
 final class Tree

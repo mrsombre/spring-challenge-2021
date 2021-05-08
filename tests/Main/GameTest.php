@@ -14,8 +14,7 @@ final class GameTest extends \PHPUnit\Framework\TestCase
 {
     public function testInit()
     {
-        $fixture = "37\n";
-        $fixture .= file_get_contents(__DIR__ . '/../fixtures/field.txt');
+        $fixture = file_get_contents(__DIR__ . '/../fixtures/field.txt');
         $fixture .= file_get_contents(__DIR__ . '/../fixtures/step.txt');
 
         $stream = streamFromString($fixture);
