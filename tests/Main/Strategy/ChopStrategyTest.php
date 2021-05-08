@@ -5,23 +5,43 @@ declare(strict_types=1);
 namespace Tests\Main\Strategy;
 
 use App\ChopStrategy;
-use App\Step;
-use App\Tree;
 
-use function Tests\initGame;
+use function Tests\makeField;
+use function Tests\makeGame;
+use function Tests\makeTree;
 
 final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
 {
+    public function dataFilter()
+    {
+        // level
+        yield [0, [makeTree(0, ChopStrategy::MIN_LEVEL - 1)]];
+        // dormant
+        yield [0, [makeTree(0, ChopStrategy::MIN_LEVEL, true, true)]];
+        // ok
+        yield [1, [makeTree(0, ChopStrategy::MIN_LEVEL)]];
+    }
+
+    /**
+     * @dataProvider dataFilter
+     */
+    public function testFilter(int $expected, array $trees)
+    {
+        $field = makeField();
+        $strategy = new ChopStrategy($field);
+        $game = makeGame($trees);
+
+        $this->assertCount($expected, $strategy->filter($game->trees->getMine()));
+    }
+
     public function dataNothing()
     {
         // no trees
         yield [ChopStrategy::SUN_COST, []];
         // no mine trees
-        yield [ChopStrategy::SUN_COST, [Tree::factory(0, ChopStrategy::LEVEL, 0)]];
-        // dormant
-        yield [ChopStrategy::SUN_COST, [Tree::factory(0, ChopStrategy::LEVEL, 1, 1)]];
-        // level
-        yield [ChopStrategy::SUN_COST, [Tree::factory(0, ChopStrategy::LEVEL - 1)]];
+        yield [ChopStrategy::SUN_COST, [makeTree(0, ChopStrategy::MIN_LEVEL, false)]];
+        // no sun
+        yield [ChopStrategy::SUN_COST - 1, [makeTree(0, ChopStrategy::MIN_LEVEL)]];
     }
 
     /**
@@ -29,40 +49,38 @@ final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
      */
     public function testNothing(int $sun, array $trees)
     {
-        $step = new Step();
-        $step->sun = $sun;
-        $step->setTrees($trees);
-        $game = initGame($step);
-        $strategy = new ChopStrategy($game);
+        $field = makeField();
+        $strategy = new ChopStrategy($field);
+        $game = makeGame($trees);
+        $game->sun = $sun;
 
-        $this->assertFalse($strategy->isActive());
+        $this->assertNull($strategy->move($game));
     }
 
     public function dataRichness()
     {
         // only one
-        yield [[Tree::factory(0, ChopStrategy::LEVEL)], 0];
+        yield [0, [makeTree(0, ChopStrategy::MIN_LEVEL)]];
         // by soil
         yield [
-            [
-                Tree::factory(10, 3),
-                Tree::factory(0, 3),
-            ],
             0,
+            [
+                makeTree(10, 3),
+                makeTree(0, 3),
+            ],
         ];
     }
 
     /**
      * @dataProvider dataRichness
      */
-    public function testRichness(array $trees, int $expected)
+    public function testRichness(int $expected, array $trees)
     {
-        $game = initGame();
-        $game->step->sun = 4;
-        $game->step->setTrees($trees);
-        $strategy = new ChopStrategy($game);
-        $strategy->isActive();
+        $field = makeField();
+        $strategy = new ChopStrategy($field);
+        $game = makeGame($trees);
+        $game->sun = ChopStrategy::SUN_COST;
 
-        $this->assertSame("COMPLETE $expected", $strategy->move());
+        $this->assertSame("COMPLETE $expected", $strategy->move($game));
     }
 }

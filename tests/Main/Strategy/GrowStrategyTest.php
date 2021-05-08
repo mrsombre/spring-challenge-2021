@@ -5,23 +5,43 @@ declare(strict_types=1);
 namespace Tests\Main\Strategy;
 
 use App\GrowStrategy;
-use App\Step;
-use App\Tree;
 
-use function Tests\initGame;
+use function Tests\makeField;
+use function Tests\makeGame;
+use function Tests\makeTree;
 
 final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
 {
+    public function dataFilter()
+    {
+        // level
+        yield [0, [makeTree(0, 0)]];
+        // dormant
+        yield [0, [makeTree(0, 1, true, true)]];
+        // ok
+        yield [1, [makeTree(0, 1)]];
+    }
+
+    /**
+     * @dataProvider dataFilter
+     */
+    public function testFilter(int $expected, array $trees)
+    {
+        $field = makeField();
+        $strategy = new GrowStrategy($field, 1);
+        $game = makeGame($trees);
+
+        $this->assertCount($expected, $strategy->filter($game->trees->getMine()));
+    }
+
     public function dataNothing()
     {
         // no trees
         yield [GrowStrategy::SUN_COST, []];
         // no mine trees
-        yield [GrowStrategy::SUN_COST, [Tree::factory(0, GrowStrategy::LEVEL, 0)]];
-        // dormant
-        yield [GrowStrategy::SUN_COST, [Tree::factory(0, GrowStrategy::LEVEL, 1, 1)]];
-        // level
-        yield [GrowStrategy::SUN_COST, [Tree::factory(0, GrowStrategy::LEVEL)]];
+        yield [GrowStrategy::SUN_COST, [makeTree(0, 1, false)]];
+        // no sun
+        yield [2, [makeTree(0, 1)]];
     }
 
     /**
@@ -29,50 +49,38 @@ final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
      */
     public function testNothing(int $sun, array $trees)
     {
-        $step = new Step();
-        $step->sun = $sun;
-        $step->setTrees($trees);
-        $game = initGame($step);
-        $strategy = new GrowStrategy($game);
+        $field = makeField();
+        $strategy = new GrowStrategy($field, 1);
+        $game = makeGame($trees);
+        $game->sun = $sun;
 
-        $this->assertFalse($strategy->isActive());
+        $this->assertNull($strategy->move($game));
     }
 
     public function dataGrow()
     {
         // only one
-        yield [GrowStrategy::LEVEL, [Tree::factory(0, 1)], 0];
-        // not dormant
+        yield [0, [makeTree(0, 1)]];
+        // by soil
         yield [
-            GrowStrategy::LEVEL,
-            [
-                Tree::factory(10, 1),
-                Tree::factory(0, 1),
-            ],
             0,
-        ];
-        // not dormant
-        yield [
-            GrowStrategy::LEVEL,
             [
-                Tree::factory(10, 1),
-                Tree::factory(0, 1, 1, 1),
+                makeTree(10, 1),
+                makeTree(0, 1),
             ],
-            10,
         ];
     }
 
     /**
      * @dataProvider dataGrow
      */
-    public function testGrow(int $sun, array $trees, int $expected)
+    public function testGrow(int $expected, array $trees)
     {
-        $game = initGame();
-        $game->step->sun = $sun;
-        $game->step->setTrees($trees);
-        $strategy = new GrowStrategy($game);
-        $this->assertTrue($strategy->isActive());
+        $field = makeField();
+        $strategy = new GrowStrategy($field, 1);
+        $game = makeGame($trees);
+        $game->sun = 3;
 
-        $this->assertSame("GROW $expected", $strategy->move());
+        $this->assertSame("GROW $expected", $strategy->move($game));
     }
 }

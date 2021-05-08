@@ -6,7 +6,6 @@ namespace App;
 
 use ArrayObject;
 use InvalidArgumentException;
-use Throwable;
 
 function l($message)
 {
@@ -61,7 +60,7 @@ final class Field
 
     public function byTree(Tree $tree): Cell
     {
-        return $this->byIndex($tree->cellIndex);
+        return $this->byIndex($tree->index);
     }
 }
 
@@ -90,125 +89,100 @@ final class Cell
 
 final class Game
 {
-    /** @var \App\Step */
-    public $step;
-    /** @var \App\Step[] */
-    public $steps = [];
-    /** @var \App\Field */
-    public $field;
-
     /** @var int */
-    public $numberOfSteps = 0;
-
-    public static function init($stream = STDIN): Game
-    {
-        try {
-            $game = new self();
-
-            $game->field = Field::fromStream($stream);
-            $game->step(Step::fromStream($stream));
-
-            return $game;
-        } catch (Throwable $e) {
-            l($e);
-            exit(1);
-        }
-    }
-
-    public static function run(Game $game, $stream = STDIN)
-    {
-        try {
-            $strategies = [
-                new ChopStrategy($game),
-                new GrowStrategy($game),
-            ];
-            $bot = new Bot($strategies);
-
-            while (true) {
-                echo $bot->move() . "\n";
-
-                if (!is_resource($stream)) {
-                    return;
-                }
-
-                $game->step(Step::fromStream($stream));
-            }
-        } catch (Throwable $e) {
-            l($e);
-            exit(1);
-        }
-    }
-
-    public function step(Step $step)
-    {
-        $this->steps[] = $this->step = $step;
-        $this->numberOfSteps++;
-    }
-}
-
-final class Step
-{
+    public $day;
     /** @var int */
-    public $day = 0;
+    public $nutrients;
     /** @var int */
-    public $nutrients = 0;
+    public $sun;
     /** @var int */
-    public $sun = 0;
+    public $score;
     /** @var int */
-    public $score = 0;
+    public $oppSun;
     /** @var int */
-    public $oppSun = 0;
+    public $oppScore;
+    /** @var bool */
+    public $oppIsWaiting;
     /** @var int */
-    public $oppScore = 0;
-    /** @var int */
-    public $oppIsWaiting = 0;
-    /** @var int */
-    public $numberOfTrees = 0;
+    public $numberOfTrees;
     /** @var \App\Trees */
     public $trees;
     /** @var int */
-    public $numberOfActions = 0;
+    public $numberOfActions;
     /** @var array */
-    public $actions = [];
+    public $actions;
 
     public static function fromStream($stream): self
     {
-        $step = new self();
-
-        fscanf($stream, '%d', $step->day);
-        fscanf($stream, '%d', $step->nutrients);
-        fscanf($stream, '%d %d', $step->sun, $step->score);
-        fscanf($stream, '%d %d %d', $step->oppSun, $step->oppScore, $step->oppIsWaiting);
+        fscanf($stream, '%d', $day);
+        fscanf($stream, '%d', $nutrients);
+        fscanf($stream, '%d %d', $sun, $score);
+        fscanf($stream, '%d %d %d', $oppSun, $oppScore, $oppIsWaiting);
 
         fscanf($stream, '%d', $num);
         $trees = [];
         for ($i = 0; $i < $num; $i++) {
             $trees[] = Tree::fromStream($stream);
         }
-        $step->setTrees($trees);
 
         fscanf($stream, '%d', $num);
+        $actions = [];
         for ($i = 0; $i < $num; $i++) {
             fscanf($stream, '%s', $action);
-            $step->actions[] = $action;
-            $step->numberOfActions++;
+            $actions[] = $action;
         }
 
-        return $step;
+        return new self(
+            $day,
+            $nutrients,
+            $sun,
+            $score,
+            $oppSun,
+            $oppScore,
+            (bool) $oppIsWaiting,
+            $trees,
+            $actions
+        );
     }
 
-    /**
-     * @param \App\Tree[] $trees
-     */
-    public function setTrees(array $trees): self
-    {
+    public function __construct(
+        int $day,
+        int $nutrients,
+        int $sun,
+        int $score,
+        int $oppSun,
+        int $oppScore,
+        bool $oppIsWaiting,
+        array $trees,
+        array $actions
+    ) {
+        $this->day = $day;
+        $this->nutrients = $nutrients;
+        $this->sun = $sun;
+        $this->score = $score;
+        $this->oppSun = $oppSun;
+        $this->oppScore = $oppScore;
+        $this->oppIsWaiting = $oppIsWaiting;
+
         $this->trees = new Trees($trees);
         $this->numberOfTrees = $this->trees->count();
-        return $this;
+
+        $this->actions = $actions;
+        $this->numberOfActions = count($actions);
     }
 
     public function countGrowCost(int $size): int
     {
+        // Growing a seed into a size 1 tree costs 1 sun point + the number of size 1 trees you already own.
+        if ($size === 0) {
+            $num = 0;
+            foreach ($this->trees->getMine() as $tree) {
+                if ($tree->size === 1) {
+                    $num++;
+                }
+            }
+            return 1 + $num;
+        }
         // Growing a size 1 tree into a size 2 tree costs 3 sun points + the number of size 2 trees you already own.
         if ($size === 1) {
             $num = 0;
@@ -236,48 +210,49 @@ final class Step
 final class Tree
 {
     /** @var int */
-    public $cellIndex;
+    public $index;
     /** @var int */
     public $size;
-    /** @var int */
+    /** @var bool */
     public $isMine;
-    /** @var int */
+    /** @var bool */
     public $isDormant;
 
     public static function fromStream($stream): self
     {
-        $tree = new Tree();
-        fscanf($stream, '%d %d %d %d', $tree->cellIndex, $tree->size, $tree->isMine, $tree->isDormant);
-        return $tree;
+        $data = fscanf($stream, '%d %d %d %d');
+        return new self($data[0], $data[1], (bool) $data[2], (bool) $data[3]);
     }
 
-    public static function factory(int $cellIndex, int $size = 1, int $isMine = 1, int $isDormant = 0): self
+    public function __construct(int $index, int $size, bool $isMine, bool $isDormant)
     {
-        $tree = new self();
-        $tree->cellIndex = $cellIndex;
-        $tree->size = $size;
-        $tree->isMine = $isMine;
-        $tree->isDormant = $isDormant;
-        return $tree;
+        $this->index = $index;
+        $this->size = $size;
+        $this->isMine = $isMine;
+        $this->isDormant = $isDormant;
     }
 }
 
 class Trees extends ArrayObject
 {
+    /** @var int */
+    public $numberOfMine;
     /** @var int[] */
     public $mine = [];
 
-    public function __construct($list = [])
+    public function __construct($trees = [])
     {
-        $indexedList = [];
+        $treesIndexed = [];
         /** @var \App\Tree $tree */
-        foreach ($list as $tree) {
-            $indexedList[$tree->cellIndex] = $tree;
+        foreach ($trees as $tree) {
+            $treesIndexed[$tree->index] = $tree;
             if ($tree->isMine) {
-                $this->mine[$tree->cellIndex] = $tree->cellIndex;
+                $this->mine[$tree->index] = $tree->index;
             }
         }
-        parent::__construct($indexedList);
+        $this->numberOfMine = count($this->mine);
+
+        parent::__construct($treesIndexed);
     }
 
     /**
@@ -325,130 +300,52 @@ final class Bot
 
 abstract class AbstractStrategy
 {
-    /** @var \App\Game */
-    public $game;
     /** @var \App\Field */
     public $field;
 
-    public function __construct(Game $game)
+    public function __construct(Field $field)
     {
-        $this->game = $game;
-        $this->field = $game->field;
+        $this->field = $field;
     }
 
-    function isActive(): bool
-    {
-        return true;
-    }
-
-    abstract function move(): ?string;
+    abstract function move(Game $game): ?string;
 }
 
 final class ChopStrategy extends AbstractStrategy
 {
-    public const LEVEL = 3;
+    public const MIN_LEVEL = 3;
     public const SUN_COST = 4;
 
-    /** @var \App\Tree[] */
-    private $mine;
-
-    function isActive(): bool
+    function move(Game $game): ?string
     {
-        $step = $this->game->step;
-
-        if ($step->numberOfTrees === 0) {
-            return false;
+        if ($game->sun < self::SUN_COST) {
+            return null;
         }
-        if ($step->sun < self::SUN_COST) {
-            return false;
+        if ($game->trees->numberOfMine === 0) {
+            return null;
         }
-
-        $mine = $step->trees->getMine();
+        $mine = $this->filter($game->trees->getMine());
         if (count($mine) === 0) {
-            return false;
+            return null;
         }
 
-        $mine = array_filter(
-            $mine,
-            function (Tree $tree) {
-                if ($tree->size !== self::LEVEL) {
-                    return false;
-                }
-                if ($tree->isDormant) {
-                    return false;
-                }
-                return true;
-            }
-        );
-        if ($mine === []) {
-            return false;
-        }
-        $this->mine = $mine;
-
-        return true;
-    }
-
-    function move(): ?string
-    {
-        $cell = $this->findCell();
+        $cell = $this->findCell($mine);
         if ($cell === null) {
             return null;
         }
         return "COMPLETE $cell";
     }
 
-    private function findCell(): ?int
+    /**
+     * @param \App\Tree[] $trees
+     * @return \App\Tree[]
+     */
+    public function filter(array $trees): array
     {
-        $trees = [];
-        foreach ($this->mine as $tree) {
-            $score = 0;
-            $score += $this->field->byTree($tree)->richness;
-
-            $trees[$tree->cellIndex] = $score;
-        }
-
-        arsort($trees);
-        return key($trees);
-    }
-}
-
-final class GrowStrategy extends AbstractStrategy
-{
-    public const LEVEL = 3;
-    public const SUN_COST = 3;
-
-    private $lvl2cost;
-    private $lvl3cost;
-    /** @var \App\Tree[] */
-    private $mine;
-
-    function isActive(): bool
-    {
-        $step = $this->game->step;
-
-        if ($step->numberOfTrees === 0) {
-            return false;
-        }
-        if ($step->sun < self::SUN_COST) {
-            return false;
-        }
-
-        $mine = $step->trees->getMine();
-        if (count($mine) === 0) {
-            return false;
-        }
-
-        $this->lvl2cost = $step->countGrowCost(1);
-        $this->lvl3cost = $step->countGrowCost(2);
-        // no sun to grow
-        if ($step->sun < $this->lvl2cost && $step->sun < $this->lvl3cost) {
-            return false;
-        }
-
-        $mine = array_filter(
-            $mine,
+        return array_filter(
+            $trees,
             function (Tree $tree) {
-                if ($tree->size === self::LEVEL) {
+                if ($tree->size < self::MIN_LEVEL) {
                     return false;
                 }
                 if ($tree->isDormant) {
@@ -457,49 +354,100 @@ final class GrowStrategy extends AbstractStrategy
                 return true;
             }
         );
-        if ($mine === []) {
-            return false;
-        }
-        $this->mine = $mine;
-
-        return true;
     }
 
-    function move(): ?string
+    /**
+     * @param \App\Tree[] $mine
+     * @return int
+     */
+    public function findCell(array $mine): ?int
     {
-        $cell = $this->findCell();
+        $pool = [];
+        foreach ($mine as $tree) {
+            $score = 0;
+            $score += $this->field->byTree($tree)->richness;
+
+            $pool[$tree->index] = $score;
+        }
+
+        arsort($pool);
+        return key($pool);
+    }
+}
+
+final class GrowStrategy extends AbstractStrategy
+{
+    public const MAX_LEVEL = 3;
+    public const SUN_COST = 1;
+
+    private $size;
+
+    public function __construct(Field $field, int $size)
+    {
+        if ($size >= self::MAX_LEVEL) {
+            throw new InvalidArgumentException("Invalid size {$size}.");
+        }
+        $this->size = $size;
+        parent::__construct($field);
+    }
+
+    function move(Game $game): ?string
+    {
+        $cost = $game->countGrowCost($this->size);
+        if ($game->sun < $cost) {
+            return null;
+        }
+        if ($game->trees->numberOfMine === 0) {
+            return null;
+        }
+        $mine = $this->filter($game->trees->getMine());
+        if (count($mine) === 0) {
+            return null;
+        }
+
+        $cell = $this->findCell($mine);
         if ($cell === null) {
             return null;
         }
         return "GROW $cell";
     }
 
-    private function findCell(): ?int
+    /**
+     * @param \App\Tree[] $trees
+     * @return \App\Tree[]
+     */
+    public function filter(array $trees): array
     {
-        if ($this->lvl2cost < $this->lvl3cost) {
-            if (($id = $this->findTree(1)) !== null) {
-                return $id;
+        return array_filter(
+            $trees,
+            function (Tree $tree) {
+                if ($tree->size !== $this->size) {
+                    return false;
+                }
+                if ($tree->isDormant) {
+                    return false;
+                }
+                return true;
             }
-        }
-        return $this->findTree(2);
+        );
     }
 
-    private function findTree(int $lvl): ?int
+    /**
+     * @param \App\Tree[] $mine
+     * @return int
+     */
+    public function findCell(array $mine): ?int
     {
-        $candidates = [];
-        foreach ($this->mine as $tree) {
-            if ($tree->size !== $lvl) {
-                continue;
-            }
-
+        $pool = [];
+        foreach ($mine as $tree) {
             $score = 0;
             $score += $this->field->byTree($tree)->richness;
 
-            $candidates[$tree->cellIndex] = $score;
+            $pool[$tree->index] = $score;
         }
 
-        arsort($candidates);
-        return key($candidates);
+        arsort($pool);
+        return key($pool);
     }
 }
 
@@ -509,5 +457,5 @@ if ($_ENV['APP_ENV'] !== 'prod') {
     return;
 }
 
-$game = Game::init();
-Game::run($game);
+$field = Field::fromStream(STDIN);
+l($field);
