@@ -5,43 +5,64 @@ declare(strict_types=1);
 namespace Tests\Main\Strategy;
 
 use App\ChopStrategy;
+use App\Step;
+use App\Tree;
 
-use function Tests\gameTrees;
 use function Tests\initGame;
-use function Tests\makeStep;
 
 final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
 {
-    public function testNothing()
+    public function dataNothing()
     {
-        $game = initGame();
-
-        $strategy = new ChopStrategy($game);
-        $this->assertNull($strategy->move());
+        // no trees
+        yield [ChopStrategy::SUN_COST, []];
+        // no mine trees
+        yield [ChopStrategy::SUN_COST, [Tree::factory(0, ChopStrategy::LEVEL, 0)]];
+        // dormant
+        yield [ChopStrategy::SUN_COST, [Tree::factory(0, ChopStrategy::LEVEL, 1, 1)]];
+        // level
+        yield [ChopStrategy::SUN_COST, [Tree::factory(0, ChopStrategy::LEVEL - 1)]];
     }
 
-    public function testSun()
+    /**
+     * @dataProvider dataNothing
+     */
+    public function testNothing(int $sun, array $trees)
     {
-        $game = initGame();
-        $game->step->sun = 3;
-
+        $step = new Step();
+        $step->sun = $sun;
+        $step->setTrees($trees);
+        $game = initGame($step);
         $strategy = new ChopStrategy($game);
-        $this->assertNull($strategy->move());
+
+        $this->assertFalse($strategy->isActive());
     }
 
-    public function testSoil()
+    public function dataRichness()
     {
-        $game = initGame();
-        gameTrees(
-            $game,
+        // only one
+        yield [[Tree::factory(0, ChopStrategy::LEVEL)], 0];
+        // by soil
+        yield [
             [
-                '2 3 1 0',
-                '10 3 1 0',
-            ]
-        );
-        $game->step->sun = 4;
+                Tree::factory(10, 3),
+                Tree::factory(0, 3),
+            ],
+            0,
+        ];
+    }
 
+    /**
+     * @dataProvider dataRichness
+     */
+    public function testRichness(array $trees, int $expected)
+    {
+        $game = initGame();
+        $game->step->sun = 4;
+        $game->step->setTrees($trees);
         $strategy = new ChopStrategy($game);
-        $this->assertSame('COMPLETE 2', $strategy->move());
+        $strategy->isActive();
+
+        $this->assertSame("COMPLETE $expected", $strategy->move());
     }
 }

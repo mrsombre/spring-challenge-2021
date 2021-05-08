@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Main;
 
 use App\Step;
+use App\Tree;
 
 use function Tests\streamFromString;
 
@@ -33,5 +34,49 @@ final class StepTest extends \PHPUnit\Framework\TestCase
 
         $this->assertSame(7, $step->numberOfActions);
         $this->assertSame('WAIT', $step->actions[0]);
+    }
+
+    public function dataGrowCost()
+    {
+        yield [
+            [
+                Tree::factory(0, 1),
+            ],
+            3,
+        ];
+
+        yield [
+            [
+                Tree::factory(0, 1),
+                Tree::factory(1, 2),
+            ],
+            4,
+        ];
+
+        yield [
+            [
+                Tree::factory(0, 2),
+            ],
+            7,
+        ];
+
+        yield [
+            [
+                Tree::factory(0, 2),
+                Tree::factory(1, 3),
+            ],
+            8,
+        ];
+    }
+
+    /**
+     * @dataProvider dataGrowCost
+     */
+    public function testGrowCost(array $trees, int $cost)
+    {
+        $step = new Step();
+        $step->setTrees($trees);
+
+        $this->assertSame($cost, $step->countGrowCost($step->trees->byIndex(0)->size));
     }
 }

@@ -30,23 +30,3 @@ function initGame(Step $step = null): Game
 
     return $game;
 }
-
-function gameTrees(Game $game, array $trees)
-{
-    $stepData = [
-        '0',
-        '0',
-        '0 0',
-        '0 0 0',
-        count($trees),
-    ];
-
-    foreach ($trees as $tree) {
-        $stepData[] = $tree;
-    }
-
-    $stepData[] = 1;
-    $stepData[] = 'WAIT';
-
-    $game->step(Step::fromStream(streamFromString(implode("\n", $stepData))));
-}
