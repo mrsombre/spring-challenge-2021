@@ -4,22 +4,43 @@ declare(strict_types=1);
 
 namespace Tests\Main\Strategy;
 
+use App\Action;
 use App\ChopStrategy;
 
 use function Tests\makeField;
 use function Tests\makeGame;
-use function Tests\makeTree;
 
 final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
 {
+    public function dataNothing()
+    {
+        // no mine
+        yield [4, ['0 0 0 0']];
+        // no sun
+        yield [0, ['0 3 1 0']];
+    }
+
+    /**
+     * @dataProvider dataNothing
+     */
+    public function testNothing(int $sun, array $trees)
+    {
+        $field = makeField();
+        $strategy = new ChopStrategy($field);
+        $game = makeGame($trees);
+        $game->me->sun = $sun;
+
+        $this->assertNull($strategy->action($game));
+    }
+
     public function dataFilter()
     {
-        // level
-        yield [0, [makeTree(0, ChopStrategy::MIN_LEVEL - 1)]];
-        // dormant
-        yield [0, [makeTree(0, ChopStrategy::MIN_LEVEL, true, true)]];
         // ok
-        yield [1, [makeTree(0, ChopStrategy::MIN_LEVEL)]];
+        yield [1, ['0 3 1 0']];
+        // small
+        yield [0, ['0 0 1 0']];
+        // dormant
+        yield [0, ['0 3 1 1']];
     }
 
     /**
@@ -31,56 +52,43 @@ final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
         $strategy = new ChopStrategy($field);
         $game = makeGame($trees);
 
-        $this->assertCount($expected, $strategy->filter($game->trees->getMine()));
+        $this->assertCount($expected, $strategy->filterTrees($game->trees->getMine()));
     }
 
-    public function dataNothing()
+    public function dataMatch()
     {
-        // no trees
-        yield [ChopStrategy::SUN_COST, []];
-        // no mine trees
-        yield [ChopStrategy::SUN_COST, [makeTree(0, ChopStrategy::MIN_LEVEL, false)]];
-        // no sun
-        yield [ChopStrategy::SUN_COST - 1, [makeTree(0, ChopStrategy::MIN_LEVEL)]];
+        // one
+        yield [0, 4, ['0 3 1 0']];
     }
 
     /**
-     * @dataProvider dataNothing
+     * @dataProvider dataMatch
      */
-    public function testNothing(int $sun, array $trees)
+    public function testMatch(int $expected, int $sun, array $trees)
     {
         $field = makeField();
         $strategy = new ChopStrategy($field);
         $game = makeGame($trees);
-        $game->sun = $sun;
+        $game->me->sun = $sun;
 
-        $this->assertNull($strategy->action($game));
+        $this->assertEquals(Action::factory(Action::TYPE_COMPLETE, $expected), $strategy->action($game));
     }
 
-    public function dataRichness()
+    public function dataScore()
     {
-        // only one
-        yield [0, [makeTree(0, ChopStrategy::MIN_LEVEL)]];
-        // by soil
-        yield [
-            0,
-            [
-                makeTree(10, 3),
-                makeTree(0, 3),
-            ],
-        ];
+        yield [3, 0, ['0 3 1 0']];
+        yield [2, 7, ['7 3 1 0']];
     }
 
     /**
-     * @dataProvider dataRichness
+     * @dataProvider dataScore
      */
-    public function testRichness(int $expected, array $trees)
+    public function testScore(int $expected, int $index, array $trees)
     {
         $field = makeField();
         $strategy = new ChopStrategy($field);
         $game = makeGame($trees);
-        $game->sun = ChopStrategy::SUN_COST;
 
-        $this->assertSame("COMPLETE $expected", $strategy->action($game));
+        $this->assertSame($expected, $strategy->countScore($game->trees->byIndex($index)));
     }
 }

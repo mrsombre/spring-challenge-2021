@@ -216,6 +216,7 @@ final class Action
 {
     public const TYPE_WAIT = 'WAIT';
     public const TYPE_SEED = 'SEED';
+    public const TYPE_COMPLETE = 'COMPLETE';
 
     /** @var string */
     public $type;
@@ -357,13 +358,14 @@ final class SeedStrategy extends AbstractStrategy
 
     public function action(Game $game): ?Action
     {
+        $cost = $game->countSeedCost();
+        if ($cost > $game->me->sun) {
+            return null;
+        }
+
         $trees = $game->trees->getMine();
         $trees = $this->filterTrees($trees);
         if ($trees === []) {
-            return null;
-        }
-        $cost = $game->countSeedCost();
-        if ($cost > $game->me->sun) {
             return null;
         }
 
@@ -429,29 +431,33 @@ final class ChopStrategy extends AbstractStrategy
 
     function action(Game $game): ?Action
     {
-        if ($game->sun < self::SUN_COST) {
-            return null;
-        }
-        if ($game->trees->numberOfMine === 0) {
-            return null;
-        }
-        $mine = $this->filter($game->trees->getMine());
-        if (count($mine) === 0) {
+        if (self::SUN_COST > $game->me->sun) {
             return null;
         }
 
-        $cell = $this->findCell($mine);
-        if ($cell === null) {
+        $trees = $game->trees->getMine();
+        $trees = $this->filterTrees($trees);
+        if ($trees === []) {
             return null;
         }
-        return "COMPLETE $cell";
+
+        $pool = [];
+        foreach ($trees as $tree) {
+            $pool[$tree->index] = $this->countScore($tree);
+        }
+        if ($pool === []) {
+            return null;
+        }
+
+        arsort($pool);
+        return Action::factory(Action::TYPE_COMPLETE, key($pool));
     }
 
     /**
      * @param \App\Tree[] $trees
      * @return \App\Tree[]
      */
-    public function filter(array $trees): array
+    public function filterTrees(array $trees): array
     {
         return array_filter(
             $trees,
@@ -467,22 +473,12 @@ final class ChopStrategy extends AbstractStrategy
         );
     }
 
-    /**
-     * @param \App\Tree[] $mine
-     * @return int
-     */
-    public function findCell(array $mine): ?int
+    public function countScore(Tree $tree)
     {
-        $pool = [];
-        foreach ($mine as $tree) {
-            $score = 0;
-            $score += $this->field->byTree($tree)->richness;
+        $score = 0;
+        $score += $this->field->byTree($tree)->richness;
 
-            $pool[$tree->index] = $score;
-        }
-
-        arsort($pool);
-        return key($pool);
+        return $score;
     }
 }
 
