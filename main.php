@@ -320,31 +320,6 @@ class Trees
     }
 }
 
-final class Bot
-{
-    /** @var \App\AbstractStrategy[] */
-    public $strategies = [];
-
-    public function __construct(array $strategies)
-    {
-        $this->strategies = $strategies;
-    }
-
-    public function move(): string
-    {
-        foreach ($this->strategies as $strategy) {
-            if (!$strategy->isActive()) {
-                continue;
-            }
-            $move = $strategy->action();
-            if ($move !== null) {
-                return $move;
-            }
-        }
-        return 'WAIT';
-    }
-}
-
 abstract class AbstractStrategy
 {
     /** @var \App\Field */
@@ -359,6 +334,21 @@ abstract class AbstractStrategy
     }
 
     abstract public function action(Game $game): ?Action;
+}
+
+final class CompositeStrategy extends AbstractStrategy
+{
+    public function action(Game $game): ?Action
+    {
+        /** @var \App\AbstractStrategy $strategy */
+        foreach ($this->config['strategies'] as $strategy) {
+            $action = $strategy->action($game);
+            if ($action) {
+                return $action;
+            }
+        }
+        return null;
+    }
 }
 
 final class SeedStrategy extends AbstractStrategy
