@@ -216,6 +216,7 @@ final class Action
 {
     public const TYPE_WAIT = 'WAIT';
     public const TYPE_SEED = 'SEED';
+    public const TYPE_GROW = 'GROW';
     public const TYPE_COMPLETE = 'COMPLETE';
 
     /** @var string */
@@ -485,50 +486,42 @@ final class ChopStrategy extends AbstractStrategy
 final class GrowStrategy extends AbstractStrategy
 {
     public const MAX_LEVEL = 3;
-    public const SUN_COST = 1;
-
-    private $size;
-
-    public function __construct(Field $field, int $size)
-    {
-        if ($size >= self::MAX_LEVEL) {
-            throw new InvalidArgumentException("Invalid size {$size}.");
-        }
-        $this->size = $size;
-        parent::__construct($field);
-    }
 
     function action(Game $game): ?Action
     {
-        $cost = $game->countGrowCost($this->size);
-        if ($game->sun < $cost) {
-            return null;
-        }
-        if ($game->trees->numberOfMine === 0) {
-            return null;
-        }
-        $mine = $this->filter($game->trees->getMine());
-        if (count($mine) === 0) {
+        $cost = $game->countGrowCost();
+        if (min($cost) > $game->me->sun) {
             return null;
         }
 
-        $cell = $this->findCell($mine);
-        if ($cell === null) {
+        $trees = $game->trees->getMine();
+        $trees = $this->filterTrees($trees);
+        if ($trees === []) {
             return null;
         }
-        return "GROW $cell";
+
+        $pool = [];
+        foreach ($trees as $tree) {
+            $pool[$tree->index] = $this->countScore($tree);
+        }
+        if ($pool === []) {
+            return null;
+        }
+
+        arsort($pool);
+        return Action::factory(Action::TYPE_GROW, key($pool));
     }
 
     /**
      * @param \App\Tree[] $trees
      * @return \App\Tree[]
      */
-    public function filter(array $trees): array
+    public function filterTrees(array $trees): array
     {
         return array_filter(
             $trees,
             function (Tree $tree) {
-                if ($tree->size !== $this->size) {
+                if ($tree->size >= self::MAX_LEVEL) {
                     return false;
                 }
                 if ($tree->isDormant) {
@@ -539,22 +532,14 @@ final class GrowStrategy extends AbstractStrategy
         );
     }
 
-    /**
-     * @param \App\Tree[] $mine
-     * @return int
-     */
-    public function findCell(array $mine): ?int
+    public function countScore(Tree $tree)
     {
-        $pool = [];
-        foreach ($mine as $tree) {
-            $score = 0;
-            $score += $this->field->byTree($tree)->richness;
+        $score = 0;
+        $score += $this->field->byTree($tree)->richness;
 
-            $pool[$tree->index] = $score;
-        }
+        $score += $tree->size;
 
-        arsort($pool);
-        return key($pool);
+        return $score;
     }
 }
 
