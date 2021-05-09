@@ -20,66 +20,45 @@ final class GameTest extends \PHPUnit\Framework\TestCase
 
         $this->assertSame(0, $game->day);
         $this->assertSame(20, $game->nutrients);
-        $this->assertSame(18, $game->sun);
-        $this->assertSame(1, $game->score);
+        $this->assertSame(18, $game->me->sun);
+        $this->assertSame(1, $game->me->score);
 
-        $this->assertSame(19, $game->oppSun);
-        $this->assertSame(2, $game->oppScore);
-        $this->assertSame(false, $game->oppIsWaiting);
+        $this->assertSame(19, $game->opp->sun);
+        $this->assertSame(2, $game->opp->score);
+        $this->assertSame(false, $game->opp->isWaiting);
 
-        $this->assertSame(12, $game->numberOfTrees);
+        $this->assertSame(12, $game->trees->numberOfTrees);
         $this->assertSame(7, $game->trees->byIndex(7)->index);
         $this->assertSame(3, $game->trees->byIndex(7)->size);
         $this->assertSame(false, $game->trees->byIndex(7)->isMine);
         $this->assertSame(false, $game->trees->byIndex(7)->isDormant);
 
-        $this->assertSame(7, $game->numberOfActions);
-        $this->assertSame('WAIT', $game->actions[0]);
+        $this->assertSame(7, count($game->actions));
+        $this->assertSame('WAIT', $game->actions[0]->type);
     }
 
     public function dataGrowCost()
     {
         // size 0
-        yield [[makeTree(0, 0)], 1];
-
-        yield [
-            [
-                makeTree(0, 0),
-                makeTree(1, 1),
-            ],
-            2,
-        ];
+        yield [1, 0, [makeTree(0, 0)]];
+        yield [2, 0, [makeTree(0, 1)]];
 
         // size 1
-        yield [[makeTree(0, 1)], 3];
-
-        yield [
-            [
-                makeTree(0, 1),
-                makeTree(1, 2),
-            ],
-            4,
-        ];
+        yield [3, 1, [makeTree(0, 1)]];
+        yield [4, 1, [makeTree(0, 2)]];
 
         // size 2
-        yield [[makeTree(0, 2)], 7];
-
-        yield [
-            [
-                makeTree(0, 2),
-                makeTree(1, 3),
-            ],
-            8,
-        ];
+        yield [7, 2, [makeTree(0, 2)]];
+        yield [8, 2, [makeTree(0, 3)]];
     }
 
     /**
      * @dataProvider dataGrowCost
      */
-    public function testGrowCost(array $trees, int $cost)
+    public function testGrowCost(int $expected, int $size, array $trees)
     {
         $game = makeGame($trees);
 
-        $this->assertSame($cost, $game->countGrowCost($game->trees->byIndex(0)->size));
+        $this->assertSame($expected, $game->countGrowCost()[$size]);
     }
 }

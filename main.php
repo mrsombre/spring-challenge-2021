@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App;
 
-use ArrayObject;
 use InvalidArgumentException;
 
 function l($message)
@@ -33,8 +32,7 @@ final class Field
 
         $cells = [];
         for ($i = 0; $i < $num; $i++) {
-            $cell = Cell::fromStream($stream);
-            $cells[$cell->index] = $cell;
+            $cells[] = Cell::factory(...fscanf($stream, '%d %d %d %d %d %d %d %d'));
         }
 
         return new self($cells);
@@ -73,10 +71,9 @@ final class Cell
     /** @var int[] */
     public $neighs;
 
-    public static function fromStream($stream): self
+    public static function factory(int $index, int $richness, int ...$neighs): self
     {
-        $data = fscanf($stream, '%d %d %d %d %d %d %d %d');
-        return new self($data[0], $data[1], array_slice($data, 2));
+        return new self($index, $richness, $neighs);
     }
 
     public function __construct(int $index, int $richness, array $neighs)
@@ -93,53 +90,35 @@ final class Game
     public $day;
     /** @var int */
     public $nutrients;
-    /** @var int */
-    public $sun;
-    /** @var int */
-    public $score;
-    /** @var int */
-    public $oppSun;
-    /** @var int */
-    public $oppScore;
-    /** @var bool */
-    public $oppIsWaiting;
-    /** @var int */
-    public $numberOfTrees;
+    /** @var \App\Player */
+    public $me;
+    /** @var \App\Player */
+    public $opp;
     /** @var \App\Trees */
     public $trees;
-    /** @var int */
-    public $numberOfActions;
-    /** @var array */
+    /** @var \App\Action[] */
     public $actions;
 
     public static function fromStream($stream): self
     {
         fscanf($stream, '%d', $day);
         fscanf($stream, '%d', $nutrients);
-        fscanf($stream, '%d %d', $sun, $score);
-        fscanf($stream, '%d %d %d', $oppSun, $oppScore, $oppIsWaiting);
+        $me = Player::factory(...fscanf($stream, '%d %d'));
+        $opp = Player::factory(...fscanf($stream, '%d %d %d'));
 
-        fscanf($stream, '%d', $num);
-        $trees = [];
-        for ($i = 0; $i < $num; $i++) {
-            $trees[] = Tree::fromStream($stream);
-        }
+        $trees = Trees::fromStream($stream);
 
         fscanf($stream, '%d', $num);
         $actions = [];
         for ($i = 0; $i < $num; $i++) {
-            fscanf($stream, '%s', $action);
-            $actions[] = $action;
+            $actions[] = Action::factory(...fscanf($stream, '%s'));
         }
 
         return new self(
             $day,
             $nutrients,
-            $sun,
-            $score,
-            $oppSun,
-            $oppScore,
-            (bool) $oppIsWaiting,
+            $me,
+            $opp,
             $trees,
             $actions
         );
@@ -148,67 +127,82 @@ final class Game
     public function __construct(
         int $day,
         int $nutrients,
-        int $sun,
-        int $score,
-        int $oppSun,
-        int $oppScore,
-        bool $oppIsWaiting,
-        array $trees,
+        Player $me,
+        Player $opp,
+        Trees $trees,
         array $actions
     ) {
         $this->day = $day;
         $this->nutrients = $nutrients;
-        $this->sun = $sun;
-        $this->score = $score;
-        $this->oppSun = $oppSun;
-        $this->oppScore = $oppScore;
-        $this->oppIsWaiting = $oppIsWaiting;
-
-        $this->trees = new Trees($trees);
-        $this->numberOfTrees = $this->trees->count();
-
+        $this->me = $me;
+        $this->opp = $opp;
+        $this->trees = $trees;
         $this->actions = $actions;
-        $this->numberOfActions = count($actions);
     }
 
-    public function countGrowCost(int $size): int
+    public function countGrowCost(): array
     {
-        // Growing a seed into a size 1 tree costs 1 sun point + the number of size 1 trees you already own.
-        if ($size === 0) {
-            $num = 0;
-            foreach ($this->trees->getMine() as $tree) {
-                if ($tree->size === 1) {
-                    $num++;
-                }
-            }
-            return 1 + $num;
+        $treesBySize = array_fill_keys(Tree::SIZE, 0);
+        foreach ($this->trees->getMine() as $tree) {
+            $treesBySize[$tree->size]++;
         }
-        // Growing a size 1 tree into a size 2 tree costs 3 sun points + the number of size 2 trees you already own.
-        if ($size === 1) {
-            $num = 0;
-            foreach ($this->trees->getMine() as $tree) {
-                if ($tree->size === 2) {
-                    $num++;
-                }
-            }
-            return 3 + $num;
-        }
-        // Growing a size 2 tree into a size 3 tree costs 7 sun points + the number of size 3 trees you already own.
-        if ($size === 2) {
-            $num = 0;
-            foreach ($this->trees->getMine() as $tree) {
-                if ($tree->size === 3) {
-                    $num++;
-                }
-            }
-            return 7 + $num;
-        }
-        throw new InvalidArgumentException("Invalid size.");
+
+        return [
+            0 => 1 + $treesBySize[1],
+            1 => 3 + $treesBySize[2],
+            2 => 7 + $treesBySize[3],
+        ];
+    }
+}
+
+final class Player
+{
+    /** @var int */
+    public $sun;
+    /** @var int */
+    public $score;
+    /** @var bool */
+    public $isWaiting;
+
+    public static function factory(int $sun = 0, int $score = 0, int $isWaiting = 0): self
+    {
+        return new self($sun, $score, (bool) $isWaiting);
+    }
+
+    public function __construct(int $sun, int $score, bool $isWaiting)
+    {
+        $this->sun = $sun;
+        $this->score = $score;
+        $this->isWaiting = $isWaiting;
+    }
+}
+
+final class Action
+{
+    public const TYPE_WAIT = 'WAIT';
+
+    /** @var string */
+    public $type;
+    /** @var array */
+    public $params = [];
+
+    public static function factory(string $command = self::TYPE_WAIT): self
+    {
+        $parts = explode(' ', $command);
+        return new self(array_shift($parts), $parts);
+    }
+
+    public function __construct(string $type, array $params = [])
+    {
+        $this->type = $type;
+        $this->params = $params;
     }
 }
 
 final class Tree
 {
+    public const SIZE = [0, 1, 2, 3];
+
     /** @var int */
     public $index;
     /** @var int */
@@ -218,10 +212,9 @@ final class Tree
     /** @var bool */
     public $isDormant;
 
-    public static function fromStream($stream): self
+    public static function factory(int $index = 0, int $size = 0, int $isMine = 1, int $isDormant = 0): self
     {
-        $data = fscanf($stream, '%d %d %d %d');
-        return new self($data[0], $data[1], (bool) $data[2], (bool) $data[3]);
+        return new self($index, $size, (bool) $isMine, (bool) $isDormant);
     }
 
     public function __construct(int $index, int $size, bool $isMine, bool $isDormant)
@@ -233,26 +226,36 @@ final class Tree
     }
 }
 
-class Trees extends ArrayObject
+class Trees
 {
+    /** @var \App\Tree[] */
+    public $trees;
     /** @var int */
-    public $numberOfMine;
-    /** @var int[] */
-    public $mine = [];
+    public $numberOfTrees;
 
-    public function __construct($trees = [])
+    public static function fromStream($stream): self
+    {
+        fscanf($stream, '%d', $num);
+
+        $trees = [];
+        for ($i = 0; $i < $num; $i++) {
+            $trees[] = Tree::factory(...fscanf($stream, '%d %d %d %d'));
+        }
+
+        return new self($trees);
+    }
+
+    /**
+     * @param \App\Tree[] $trees
+     */
+    public function __construct(array $trees = [])
     {
         $treesIndexed = [];
-        /** @var \App\Tree $tree */
         foreach ($trees as $tree) {
             $treesIndexed[$tree->index] = $tree;
-            if ($tree->isMine) {
-                $this->mine[$tree->index] = $tree->index;
-            }
         }
-        $this->numberOfMine = count($this->mine);
-
-        parent::__construct($treesIndexed);
+        $this->trees = $treesIndexed;
+        $this->numberOfTrees = count($this->trees);
     }
 
     /**
@@ -261,15 +264,18 @@ class Trees extends ArrayObject
     public function getMine(): array
     {
         $result = [];
-        foreach ($this->mine as $index) {
-            $result[$index] = $this->byIndex($index);
+        foreach ($this->trees as $tree) {
+            if (!$tree->isMine) {
+                continue;
+            }
+            $result[$tree->index] = $tree;
         }
         return $result;
     }
 
-    public function byIndex(int $index): Tree
+    public function byIndex(int $index): ?Tree
     {
-        return $this->offsetGet($index);
+        return $this->trees[$index] ?? null;
     }
 }
 

@@ -6,7 +6,9 @@ namespace Tests;
 
 use App\Field;
 use App\Game;
+use App\Player;
 use App\Tree;
+use App\Trees;
 
 function streamFromString(string $string)
 {
@@ -26,25 +28,14 @@ function makeField(string $file = null): Field
     return Field::fromStream(streamFromString($fixture));
 }
 
-function makeGame(
-    array $trees,
-    int $day = 0,
-    int $nutrients = 20,
-    int $sun = 0,
-    int $score = 0,
-    int $oppSun = 0,
-    int $oppScore = 0,
-    bool $oppIsWaiting = false
-) {
+function makeGame(array $trees = [])
+{
     return new Game(
-        $day,
-        $nutrients,
-        $sun,
-        $score,
-        $oppSun,
-        $oppScore,
-        $oppIsWaiting,
-        $trees,
+        0,
+        20,
+        Player::factory(),
+        Player::factory(),
+        new Trees($trees),
         []
     );
 }
