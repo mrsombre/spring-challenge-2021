@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Main;
 
+use App\Action;
 use App\Game;
 
 use function Tests\streamFromString;
@@ -35,6 +36,7 @@ final class GameTest extends \PHPUnit\Framework\TestCase
 
         $this->assertSame(7, count($game->actions));
         $this->assertSame('WAIT', $game->actions[0]->type);
+        $this->assertEquals(Action::factory('COMPLETE 22'), $game->actions[1]);
     }
 
     public function dataGrowCost()
@@ -60,5 +62,22 @@ final class GameTest extends \PHPUnit\Framework\TestCase
         $game = makeGame($trees);
 
         $this->assertSame($expected, $game->countGrowCost()[$size]);
+    }
+
+    public function dataSeedCost()
+    {
+        // size 0
+        yield [0, [makeTree(0, 1)]];
+        yield [1, [makeTree(0, 0)]];
+    }
+
+    /**
+     * @dataProvider dataSeedCost
+     */
+    public function testSeedCost(int $expected, array $trees)
+    {
+        $game = makeGame($trees);
+
+        $this->assertSame($expected, $game->countSeedCost());
     }
 }

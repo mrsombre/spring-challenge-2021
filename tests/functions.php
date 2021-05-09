@@ -7,14 +7,16 @@ namespace Tests;
 use App\Field;
 use App\Game;
 use App\Player;
-use App\Tree;
 use App\Trees;
+use App\Tree;
+use App\Action;
 
 function streamFromString(string $string)
 {
     $stream = fopen('php://memory', 'r+');
     fwrite($stream, $string);
     rewind($stream);
+
     return $stream;
 }
 
@@ -23,13 +25,28 @@ function makeField(string $file = null): Field
     if ($file === null) {
         $file = __DIR__ . '/fixtures/field.txt';
     }
-
     $fixture = file_get_contents($file);
-    return Field::fromStream(streamFromString($fixture));
+    $stream = streamFromString($fixture);
+
+    return Field::fromStream($stream);
 }
 
-function makeGame(array $trees = [])
+function makeGame(array $treesData = [])
 {
+    $trees = [];
+    foreach ($treesData as $tree) {
+        if (is_string($tree)) {
+            $params = array_filter(
+                sscanf($tree, '%d %d %d %d'),
+                function ($value) {
+                    return !is_null($value);
+                }
+            );
+            $tree = Tree::factory(...$params);
+        }
+        $trees[] = $tree;
+    }
+
     return new Game(
         0,
         20,
@@ -40,7 +57,15 @@ function makeGame(array $trees = [])
     );
 }
 
-function makeTree(int $index, int $size, bool $isMine = true, bool $isDormant = false)
+/**
+ * @param array $actionsData
+ * @return \App\Action[]
+ */
+function makeActions(array $actionsData): array
 {
-    return new Tree($index, $size, $isMine, $isDormant);
+    $actions = [];
+    foreach ($actionsData as $datum) {
+        $actions[] = Action::factory(...sscanf($datum, '%s %d %d'));
+    }
+    return $actions;
 }

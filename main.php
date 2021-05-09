@@ -60,6 +60,29 @@ final class Field
     {
         return $this->byIndex($tree->index);
     }
+
+    /**
+     * @return \App\Cell[]
+     */
+    public function neighsByCell(Cell $cell): array
+    {
+        $neighs = [];
+        foreach ($cell->neighs as $index) {
+            if ($index === -1) {
+                continue;
+            }
+            $neighs[$index] = $this->byIndex($index);
+        }
+        return $neighs;
+    }
+
+    /**
+     * @return \App\Cell[]
+     */
+    public function neighsByIndex(int $index): array
+    {
+        return $this->neighsByCell($this->byIndex($index));
+    }
 }
 
 final class Cell
@@ -111,7 +134,7 @@ final class Game
         fscanf($stream, '%d', $num);
         $actions = [];
         for ($i = 0; $i < $num; $i++) {
-            $actions[] = Action::factory(...fscanf($stream, '%s'));
+            $actions[] = Action::factory(...fscanf($stream, '%s %d %d'));
         }
 
         return new self(
@@ -153,6 +176,18 @@ final class Game
             2 => 7 + $treesBySize[3],
         ];
     }
+
+    public function countSeedCost(): int
+    {
+        $seeds = 0;
+        foreach ($this->trees->getMine() as $tree) {
+            if ($tree->size === 0) {
+                $seeds++;
+            }
+        }
+
+        return $seeds;
+    }
 }
 
 final class Player
@@ -180,16 +215,22 @@ final class Player
 final class Action
 {
     public const TYPE_WAIT = 'WAIT';
+    public const TYPE_SEED = 'SEED';
 
     /** @var string */
     public $type;
-    /** @var array */
+    /** @var ?int[] */
     public $params = [];
 
-    public static function factory(string $command = self::TYPE_WAIT): self
+    public static function factory(string $action = self::TYPE_WAIT, ?int ...$params): self
     {
-        $parts = explode(' ', $command);
-        return new self(array_shift($parts), $parts);
+        $params = array_filter(
+            $params,
+            function ($value) {
+                return !is_null($value);
+            }
+        );
+        return new self($action, $params);
     }
 
     public function __construct(string $type, array $params = [])
@@ -295,7 +336,7 @@ final class Bot
             if (!$strategy->isActive()) {
                 continue;
             }
-            $move = $strategy->move();
+            $move = $strategy->action();
             if ($move !== null) {
                 return $move;
             }
@@ -308,13 +349,87 @@ abstract class AbstractStrategy
 {
     /** @var \App\Field */
     public $field;
+    /** @var array */
+    public $config;
 
-    public function __construct(Field $field)
+    public function __construct(Field $field, array $config = [])
     {
         $this->field = $field;
+        $this->config = $config;
     }
 
-    abstract function move(Game $game): ?string;
+    abstract public function action(Game $game): ?Action;
+}
+
+final class SeedStrategy extends AbstractStrategy
+{
+    public const MIN_SIZE = 1;
+
+    public function action(Game $game): ?Action
+    {
+        $trees = $game->trees->getMine();
+        $trees = $this->filterTrees($trees);
+        if ($trees === []) {
+            return null;
+        }
+        $cost = $game->countSeedCost();
+        if ($cost > $game->me->sun) {
+            return null;
+        }
+
+        // actually hack
+        $pool = [];
+        foreach ($game->actions as $actionId => $action) {
+            if ($action->type !== Action::TYPE_SEED) {
+                continue;
+            }
+            $pool[$actionId] = $this->countScore($action->params[1], $game->trees);
+        }
+        if ($pool === []) {
+            return null;
+        }
+
+        arsort($pool);
+        return $game->actions[key($pool)];
+    }
+
+    /**
+     * @param \App\Tree[] $trees
+     * @return \App\Tree[]
+     */
+    public function filterTrees(array $trees): array
+    {
+        return array_filter(
+            $trees,
+            function (Tree $tree) {
+                if ($tree->size < self::MIN_SIZE) {
+                    return false;
+                }
+                if ($tree->isDormant) {
+                    return false;
+                }
+                return true;
+            }
+        );
+    }
+
+    public function countScore(int $index, Trees $trees)
+    {
+        $score = 0;
+        $score += $this->field->byIndex($index)->richness;
+
+        $neighs = $this->field->neighsByIndex($index);
+        foreach ($neighs as $cell) {
+            if ($trees->byIndex($cell->index)) {
+                continue;
+            }
+            if ($cell->richness === 3) {
+                $score++;
+            }
+        }
+
+        return $score;
+    }
 }
 
 final class ChopStrategy extends AbstractStrategy
@@ -322,7 +437,7 @@ final class ChopStrategy extends AbstractStrategy
     public const MIN_LEVEL = 3;
     public const SUN_COST = 4;
 
-    function move(Game $game): ?string
+    function action(Game $game): ?Action
     {
         if ($game->sun < self::SUN_COST) {
             return null;
@@ -397,7 +512,7 @@ final class GrowStrategy extends AbstractStrategy
         parent::__construct($field);
     }
 
-    function move(Game $game): ?string
+    function action(Game $game): ?Action
     {
         $cost = $game->countGrowCost($this->size);
         if ($game->sun < $cost) {
@@ -464,4 +579,6 @@ if ($_ENV['APP_ENV'] !== 'prod') {
 }
 
 $field = Field::fromStream(STDIN);
-l($field);
+$game = Game::fromStream(STDIN);
+
+l($game->actions);

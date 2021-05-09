@@ -54,7 +54,7 @@ final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
         $game = makeGame($trees);
         $game->sun = $sun;
 
-        $this->assertNull($strategy->move($game));
+        $this->assertNull($strategy->action($game));
     }
 
     public function dataGrow()
@@ -81,6 +81,6 @@ final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
         $game = makeGame($trees);
         $game->sun = 3;
 
-        $this->assertSame("GROW $expected", $strategy->move($game));
+        $this->assertSame("GROW $expected", $strategy->action($game));
     }
 }

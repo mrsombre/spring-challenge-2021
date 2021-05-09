@@ -54,7 +54,7 @@ final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
         $game = makeGame($trees);
         $game->sun = $sun;
 
-        $this->assertNull($strategy->move($game));
+        $this->assertNull($strategy->action($game));
     }
 
     public function dataRichness()
@@ -81,6 +81,6 @@ final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
         $game = makeGame($trees);
         $game->sun = ChopStrategy::SUN_COST;
 
-        $this->assertSame("COMPLETE $expected", $strategy->move($game));
+        $this->assertSame("COMPLETE $expected", $strategy->action($game));
     }
 }
