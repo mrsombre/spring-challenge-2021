@@ -374,6 +374,16 @@ final class SeedStrategy extends AbstractStrategy
         }
 
         $trees = $game->trees->getMine();
+        $seeds = 0;
+        foreach ($trees as $tree) {
+            if ($tree->size === 0) {
+                $seeds++;
+            }
+        }
+        if ($seeds > 1) {
+            return null;
+        }
+
         $trees = $this->filterTrees($trees);
         if ($trees === []) {
             return null;
@@ -422,7 +432,9 @@ final class SeedStrategy extends AbstractStrategy
 
         $neighs = $this->field->neighsByIndex($index);
         foreach ($neighs as $cell) {
-            if ($trees->byIndex($cell->index)) {
+            $tree = $trees->byIndex($cell->index);
+            if ($tree) {
+                $score -= $tree->size;
                 continue;
             }
             if ($cell->richness === 3) {
@@ -564,7 +576,9 @@ $strategy = new CompositeStrategy(
     $field,
     [
         'strategies' => [
+            new ChopStrategy($field),
             new SeedStrategy($field),
+            new GrowStrategy($field),
         ],
     ]
 );

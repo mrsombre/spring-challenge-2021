@@ -14,6 +14,8 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
 {
     public function dataNothing()
     {
+        // one seed
+        yield [1, ['0 1 1 0', '2 0 1 0']];
         // no mine
         yield [0, ['0 0 0 0']];
         // no sun
@@ -29,6 +31,7 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
         $strategy = new SeedStrategy($field);
         $game = makeGame($trees);
         $game->me->sun = $sun;
+        $game->actions = makeActions(['SEED 0 1']);
 
         $this->assertNull($strategy->action($game));
     }
@@ -76,8 +79,13 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
 
     public function dataScore()
     {
-        yield [5, 1, ['0 1 1 0']];
-        yield [3, 18, ['6 1 1 0']];
+        yield [4, 1, ['0 1 1 0']];
+        yield [2, 18, ['6 1 1 0']];
+        // punish for near trees
+        yield [
+            0, 18,
+            ['6 1 1 0', '7 2 1 0'],
+        ];
     }
 
     /**
