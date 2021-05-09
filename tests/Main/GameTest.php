@@ -9,7 +9,6 @@ use App\Game;
 
 use function Tests\streamFromString;
 use function Tests\makeGame;
-use function Tests\makeTree;
 
 final class GameTest extends \PHPUnit\Framework\TestCase
 {
@@ -36,22 +35,22 @@ final class GameTest extends \PHPUnit\Framework\TestCase
 
         $this->assertSame(7, count($game->actions));
         $this->assertSame('WAIT', $game->actions[0]->type);
-        $this->assertEquals(Action::factory('COMPLETE 22'), $game->actions[1]);
+        $this->assertEquals(Action::factory(Action::TYPE_COMPLETE, 22), $game->actions[1]);
     }
 
     public function dataGrowCost()
     {
         // size 0
-        yield [1, 0, [makeTree(0, 0)]];
-        yield [2, 0, [makeTree(0, 1)]];
+        yield [1, 0, ['0 0 1 0']];
+        yield [2, 0, ['0 1 1 0']];
 
         // size 1
-        yield [3, 1, [makeTree(0, 1)]];
-        yield [4, 1, [makeTree(0, 2)]];
+        yield [3, 1, ['0 1 1 0']];
+        yield [4, 1, ['0 2 1 0']];
 
         // size 2
-        yield [7, 2, [makeTree(0, 2)]];
-        yield [8, 2, [makeTree(0, 3)]];
+        yield [7, 2, ['0 2 1 0']];
+        yield [8, 2, ['0 3 1 0']];
     }
 
     /**
@@ -67,8 +66,8 @@ final class GameTest extends \PHPUnit\Framework\TestCase
     public function dataSeedCost()
     {
         // size 0
-        yield [0, [makeTree(0, 1)]];
-        yield [1, [makeTree(0, 0)]];
+        yield [0, ['0 1 1 0']];
+        yield [1, ['0 0 1 0']];
     }
 
     /**

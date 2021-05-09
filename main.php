@@ -240,6 +240,15 @@ final class Action
         $this->type = $type;
         $this->params = $params;
     }
+
+    public function __toString(): string
+    {
+        $action = $this->type;
+        if ($this->params !== []) {
+            $action .= ' ' . implode(' ', $this->params);
+        }
+        return $action . "\n";
+    }
 }
 
 final class Tree
@@ -550,6 +559,21 @@ if ($_ENV['APP_ENV'] !== 'prod') {
 }
 
 $field = Field::fromStream(STDIN);
-$game = Game::fromStream(STDIN);
 
-l($game->actions);
+$strategy = new CompositeStrategy(
+    $field,
+    [
+        'strategies' => [
+            new SeedStrategy($field),
+        ],
+    ]
+);
+
+while (true) {
+    $game = Game::fromStream(STDIN);
+    $action = $strategy->action($game);
+    if (!$action) {
+        $action = Action::factory();
+    }
+    echo $action;
+}
