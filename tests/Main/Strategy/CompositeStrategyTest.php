@@ -20,23 +20,21 @@ final class CompositeStrategyTest extends \PHPUnit\Framework\TestCase
         $strategy = new CompositeStrategy(
             $field,
             [
-                'strategies' => [
-                    new class($field) extends AbstractStrategy {
-                        public function action(Game $game): ?Action
-                        {
-                            return null;
-                        }
-                    },
-                    new class($field) extends AbstractStrategy {
-                        public function action(Game $game): ?Action
-                        {
-                            return Action::factory();
-                        }
-                    },
-                ],
+                new class($field) extends AbstractStrategy {
+                    public function action(Game $game): ?Action
+                    {
+                        return null;
+                    }
+                },
+                new class($field) extends AbstractStrategy {
+                    public function action(Game $game): ?Action
+                    {
+                        return Action::factory();
+                    }
+                },
             ]
         );
-        $game = makeGame([]);
+        $game = makeGame();
 
         $this->assertEquals(Action::factory(), $strategy->action($game));
     }

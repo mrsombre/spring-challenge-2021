@@ -14,12 +14,10 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
 {
     public function dataNothing()
     {
-        // one seed
-        yield [1, ['0 1 1 0', '2 0 1 0']];
-        // no mine
-        yield [0, ['0 0 0 0']];
         // no sun
         yield [0, ['0 0 1 0']];
+        // > 2
+        yield [99, ['0 0 1 0', '1 0 1 0']];
     }
 
     /**
@@ -33,7 +31,7 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
         $game->me->sun = $sun;
         $game->actions = makeActions(['SEED 0 1']);
 
-        $this->assertNull($strategy->action($game));
+        $this->assertFalse($strategy->isActive($game), json_encode(func_get_args()));
     }
 
     public function dataFilter()
@@ -44,6 +42,8 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
         yield [0, ['0 0 1 0']];
         // dormant
         yield [0, ['0 1 1 1']];
+        // size 3
+        yield [0, ['0 3 1 0']];
     }
 
     /**
@@ -55,7 +55,7 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
         $strategy = new SeedStrategy($field);
         $game = makeGame($trees);
 
-        $this->assertCount($expected, $strategy->filterTrees($game->trees->getMine()));
+        $this->assertCount($expected, $strategy->filterTrees($game));
     }
 
     public function dataMatch()
@@ -79,24 +79,42 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
 
     public function dataScore()
     {
-        yield [4, 1, ['0 1 1 0']];
-        yield [2, 18, ['6 1 1 0']];
-        // punish for near trees
-        yield [
-            0, 18,
-            ['6 1 1 0', '7 2 1 0'],
-        ];
+        // basic
+        yield [0, 1, ['SEED 1 0', 'SEED 1 7'], ['1 1 1 0']];
     }
 
     /**
      * @dataProvider dataScore
      */
-    public function testScore(int $expected, int $index, array $trees)
+    public function testScore(int $expected, int $index, array $actions, array $trees)
+    {
+        $field = makeField();
+        $strategy = new SeedStrategy($field);
+        $game = makeGame($trees);
+        $game->actions = makeActions($actions);
+
+        $this->assertSame($expected, $strategy->countScore($game, $game->trees->byIndex($index))->params[0]);
+    }
+
+    public function dataCellScore()
+    {
+        // basic soil 3 + neigh
+        yield [3, 0, ['0 1 1 0', '1 1 1 0']];
+        // basic soil 2 + neigh
+        yield [1, 7, ['7 1 1 0', '1 1 1 0']];
+        // basic soil 2 + neigh seed
+        yield [2, 7, ['7 1 1 0', '1 0 1 0']];
+    }
+
+    /**
+     * @dataProvider dataCellScore
+     */
+    public function testCellScore(int $expected, int $index, array $trees)
     {
         $field = makeField();
         $strategy = new SeedStrategy($field);
         $game = makeGame($trees);
 
-        $this->assertSame($expected, $strategy->countScore($index, $game->trees));
+        $this->assertSame($expected, $strategy->countCellScore($game, $index)->score);
     }
 }

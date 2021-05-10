@@ -31,7 +31,7 @@ function makeField(string $file = null): Field
     return Field::fromStream($stream);
 }
 
-function makeGame(array $treesData = [])
+function makeGame(array $treesData = []): Game
 {
     $trees = [];
     foreach ($treesData as $tree) {
