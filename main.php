@@ -736,7 +736,7 @@ class GrowStrategy extends AbstractScoreStrategy
         $trees = $game->trees->getMine();
         $cost = $game->countGrowCost();
 
-        return array_filter(
+        $available = array_filter(
             $trees,
             function (Tree $tree) use ($game, $cost) {
                 if ($tree->size >= self::MAX_LEVEL) {
@@ -751,6 +751,34 @@ class GrowStrategy extends AbstractScoreStrategy
                 return true;
             }
         );
+        if ($available === []) {
+            return [];
+        }
+
+        $availableBySize = [];
+        foreach ($available as $tree) {
+            if (!isset($availableBySize[$tree->size])) {
+                $availableBySize[$tree->size] = [
+                    'size' => $tree->size,
+                    'cnt' => 0,
+                    'trees' => [],
+                ];
+            }
+            $availableBySize[$tree->size]['cnt']++;
+            $availableBySize[$tree->size]['trees'][] = $tree;
+        }
+        usort(
+            $availableBySize,
+            function ($a, $b) {
+                $sort = $a['cnt'] <=> $b['cnt'];
+                if ($sort === 0) {
+                    $sort = $b['size'] <=> $a['size'];
+                }
+                return $sort;
+            }
+        );
+
+        return array_shift($availableBySize)['trees'];
     }
 
     public function countScore(Game $game, Tree $target): ?Score

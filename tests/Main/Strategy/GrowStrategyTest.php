@@ -63,7 +63,7 @@ final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
         // choose soil
         yield [1, 99, ['7 1 1 0', '1 1 1 0']];
         // choose size
-        yield [0, 99, ['0 2 1 0', '1 1 1 0']];
+        yield [31, 3, ['15 0 1 0', '17 0 1 0', '31 1 1 0', '34 1 1 0']];
     }
 
     /**
@@ -76,7 +76,7 @@ final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
         $game = makeGame($trees);
         $game->me->sun = $sun;
 
-        $this->assertEquals(Action::factory(Action::TYPE_GROW, $expected), $strategy->action($game));
+        $this->assertEquals(Action::factory(Action::TYPE_GROW, $expected), $strategy->action($game), json_encode(func_get_args()));
     }
 
     public function dataScore()
