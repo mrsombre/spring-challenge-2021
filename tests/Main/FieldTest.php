@@ -6,6 +6,7 @@ namespace Tests\Main;
 
 use App\Field;
 
+use function Tests\makeField;
 use function Tests\streamFromString;
 
 final class FieldTest extends \PHPUnit\Framework\TestCase
@@ -22,5 +23,28 @@ final class FieldTest extends \PHPUnit\Framework\TestCase
         $this->assertSame(3, $field->byIndex(0)->richness);
 
         $this->assertSame([1, 2, 3, 4, 5, 6], $field->byIndex(0)->neighs);
+        $this->assertSame($field->byIndex(1), $field->byIndex(0)->neighCells[0]);
+    }
+
+    public function testOppositeDirection()
+    {
+        $field = makeField();
+        $directions = [0, 1, 2, 3, 4, 5];
+        $expected = [3, 4, 5, 0, 1, 2];
+
+        foreach ($directions as $key => $direction) {
+            $this->assertSame($expected[$key], $field->oppositeDirection($direction));
+        }
+    }
+
+    public function testVector()
+    {
+        $field = makeField();
+
+        $vector = $field->vector($field->byIndex(15), 4);
+        $this->assertSame([1 => $field->byIndex(31)], $vector);
+
+        $vector = $field->vector($field->byIndex(0), 0);
+        $this->assertSame([1 => $field->byIndex(1), 2 => $field->byIndex(7), 3 => $field->byIndex(19)], $vector);
     }
 }
