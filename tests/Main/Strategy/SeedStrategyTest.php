@@ -12,18 +12,18 @@ use function Tests\makeActions;
 
 final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
 {
-    public function dataNothing()
+    public function dataIsActive()
     {
         // no sun
         yield [0, ['0 0 1 0']];
-        // > 2
+        // > grow 1
         yield [99, ['0 0 1 0', '1 0 1 0']];
     }
 
     /**
-     * @dataProvider dataNothing
+     * @dataProvider dataIsActive
      */
-    public function testNothing(int $sun, array $trees)
+    public function testIsActive(int $sun, array $trees)
     {
         $field = makeField();
         $strategy = new SeedStrategy($field);
@@ -54,8 +54,9 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
         $field = makeField();
         $strategy = new SeedStrategy($field);
         $game = makeGame($trees);
+        $game->me->sun = 4;
 
-        $this->assertCount($expected, $strategy->filterTrees($game));
+        $this->assertCount($expected, $strategy->filterTrees($game), json_encode(func_get_args()));
     }
 
     public function dataMatch()

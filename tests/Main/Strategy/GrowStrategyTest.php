@@ -12,37 +12,35 @@ use function Tests\makeGame;
 
 final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
 {
-    public function dataNothing()
+    public function dataIsActive()
     {
-        // no mine
-        yield [7, ['0 0 0 0']];
         // no sun
         yield [0, ['0 0 1 0']];
     }
 
     /**
-     * @dataProvider dataNothing
+     * @dataProvider dataIsActive
      */
-    public function testNothing(int $sun, array $trees)
+    public function testIsActive(int $sun, array $trees)
     {
         $field = makeField();
         $strategy = new GrowStrategy($field);
         $game = makeGame($trees);
         $game->me->sun = $sun;
 
-        $this->assertNull($strategy->action($game));
+        $this->assertFalse($strategy->isActive($game), json_encode(func_get_args()));
     }
 
     public function dataFilter()
     {
         // ok
-        yield [1, 1, ['0 0 1 0']];
+        yield [1, 99, ['0 0 1 0']];
         // no sun
         yield [0, 0, ['0 0 1 0']];
         // max
-        yield [0, 0, ['0 3 1 0']];
+        yield [0, 99, ['0 3 1 0']];
         // dormant
-        yield [0, 0, ['0 0 1 1']];
+        yield [0, 99, ['0 0 1 1']];
     }
 
     /**
@@ -61,11 +59,11 @@ final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
     public function dataMatch()
     {
         // one
-        yield [0, 1, ['0 0 1 0']];
+        yield [0, 99, ['0 0 1 0']];
         // choose soil
-        yield [1, 3, ['7 1 1 0', '1 1 1 0']];
+        yield [1, 99, ['7 1 1 0', '1 1 1 0']];
         // choose size
-        yield [0, 7, ['0 2 1 0', '1 1 1 0']];
+        yield [0, 99, ['0 2 1 0', '1 1 1 0']];
     }
 
     /**

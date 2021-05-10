@@ -12,28 +12,6 @@ use function Tests\makeGame;
 
 final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
 {
-    public function testWaitForBig()
-    {
-        $field = makeField();
-        $strategy = new ChopStrategy($field);
-
-        // don't allow if big < 3
-        $game = makeGame(['0 3 1 0']);
-        $game->me->sun = 4;
-        $this->assertFalse($strategy->isActive($game));
-
-        // big >= 3
-        $game = makeGame(['0 3 1 0', '1 3 1 0', '2 3 1 0', '3 3 1 0']);
-        $game->me->sun = 4;
-        $this->assertTrue($strategy->isActive($game));
-
-        // allow after day 22
-        $game = makeGame(['0 3 1 0']);
-        $game->me->sun = 4;
-        $game->day = 22;
-        $this->assertTrue($strategy->isActive($game));
-    }
-
     public function dataIsActive()
     {
         // no sun
