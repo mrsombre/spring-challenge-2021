@@ -34,7 +34,7 @@ final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
     public function dataFilter()
     {
         // ok
-        yield [1, 99, ['0 0 1 0']];
+        yield [2, 99, ['0 0 1 0', '1 0 1 0']];
         // no sun
         yield [0, 0, ['0 0 1 0']];
         // max
@@ -53,17 +53,19 @@ final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
         $game = makeGame($trees);
         $game->me->sun = $sun;
 
-        $this->assertCount($expected, $strategy->filterTrees($game));
+        $this->assertCount($expected, $strategy->filterTrees($game), json_encode(func_get_args()));
     }
 
     public function dataMatch()
     {
         // one
-        yield [0, 99, ['0 0 1 0']];
+        yield [0, 99, ['0 0 1 0', '1 0 1 0']];
         // choose soil
-        yield [1, 99, ['7 1 1 0', '1 1 1 0']];
+        yield [1, 99, ['7 0 1 0', '1 0 1 0']];
         // choose size
         yield [31, 3, ['15 0 1 0', '17 0 1 0', '31 1 1 0', '34 1 1 0']];
+        // choose size
+        yield [5, 8, ['6 0 1 0', '17 0 1 0', '34 1 1 0', '5 2 1 0', '15 2 1 0', '31 2 1 0',]];
     }
 
     /**
@@ -77,6 +79,16 @@ final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
         $game->me->sun = $sun;
 
         $this->assertEquals(Action::factory(Action::TYPE_GROW, $expected), $strategy->action($game), json_encode(func_get_args()));
+    }
+
+    public function testChooseSeed()
+    {
+        $field = makeField();
+        $strategy = new GrowStrategy($field);
+        $game = makeGame(['6 1 1 1', '17 0 1 0', '34 1 1 0', '5 3 1 0', '15 2 1 0', '31 2 1 0',]);
+        $game->me->sun = 5;
+
+        $this->assertNull($strategy->action($game));
     }
 
     public function dataScore()

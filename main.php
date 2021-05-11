@@ -568,7 +568,14 @@ final class SeedStrategy extends AbstractScoreStrategy
     public function isActive(Game $game): bool
     {
         $cost = $game->countSeedCost();
+        if ($cost === 0) {
+            return true;
+        }
         if ($cost > $game->me->sun) {
+            return false;
+        }
+
+        if ($game->getDaysRemaining() <= 6) {
             return false;
         }
 
@@ -590,7 +597,7 @@ final class SeedStrategy extends AbstractScoreStrategy
                 if ($tree->size === 0) {
                     return false;
                 }
-                if ($tree->size === 3 && $game->me->sun >= Game::CHOP_COST) {
+                if ($tree->size === 3 && $game->getDaysRemaining() <= 6) {
                     return false;
                 }
                 if ($tree->isDormant) {
@@ -755,30 +762,49 @@ class GrowStrategy extends AbstractScoreStrategy
             return [];
         }
 
-        $availableBySize = [];
-        foreach ($available as $tree) {
-            if (!isset($availableBySize[$tree->size])) {
-                $availableBySize[$tree->size] = [
+        $choosen = $this->chooseSize($available);
+        // prefer seed
+        $treesBySize = $game->countTreesBySize();
+        if ($treesBySize[0] < 2 && $game->getDaysRemaining() >= 6) {
+            l('Seed preffered');
+            return [];
+        }
+
+        return $choosen['trees'];
+    }
+
+    /**
+     * @param \App\Tree[] $trees
+     * @return array
+     */
+    public function chooseSize(array $trees): array
+    {
+        $bySize = [];
+        foreach ($trees as $tree) {
+            if (!isset($bySize[$tree->size])) {
+                $bySize[$tree->size] = [
                     'size' => $tree->size,
                     'cnt' => 0,
                     'trees' => [],
                 ];
             }
-            $availableBySize[$tree->size]['cnt']++;
-            $availableBySize[$tree->size]['trees'][] = $tree;
+            $bySize[$tree->size]['cnt']++;
+            $bySize[$tree->size]['trees'][] = $tree;
         }
         usort(
-            $availableBySize,
+            $bySize,
             function ($a, $b) {
-                $sort = $a['cnt'] <=> $b['cnt'];
+                // sort by count in group
+                $sort = $b['cnt'] <=> $a['cnt'];
                 if ($sort === 0) {
+                    // then sort by size bigger first
                     $sort = $b['size'] <=> $a['size'];
                 }
                 return $sort;
             }
         );
 
-        return array_shift($availableBySize)['trees'];
+        return array_shift($bySize);
     }
 
     public function countScore(Game $game, Tree $target): ?Score

@@ -34,6 +34,29 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
         $this->assertFalse($strategy->isActive($game), json_encode(func_get_args()));
     }
 
+    public function dataDisabledEndGame()
+    {
+        // disabled
+        yield [false, ['0 0 1 0', '0 0 1 0']];
+        // enabled free
+        yield [true, ['0 1 1 0']];
+    }
+
+    /**
+     * @dataProvider dataDisabledEndGame
+     */
+    public function testDisabledEndGame(bool $expected, array $trees)
+    {
+        $field = makeField();
+        $strategy = new SeedStrategy($field);
+        $game = makeGame($trees);
+        $game->me->sun = 99;
+        $game->day = 17;
+        $game->actions = makeActions(['SEED 0 1']);
+
+        $this->assertSame($expected, $strategy->isActive($game), json_encode(func_get_args()));
+    }
+
     public function dataFilter()
     {
         // ok
@@ -42,8 +65,6 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
         yield [0, ['0 0 1 0']];
         // dormant
         yield [0, ['0 1 1 1']];
-        // size 3
-        yield [0, ['0 3 1 0']];
     }
 
     /**
@@ -54,9 +75,21 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
         $field = makeField();
         $strategy = new SeedStrategy($field);
         $game = makeGame($trees);
-        $game->me->sun = 4;
 
         $this->assertCount($expected, $strategy->filterTrees($game), json_encode(func_get_args()));
+    }
+
+    public function testDontUseBig()
+    {
+        $field = makeField();
+        $strategy = new SeedStrategy($field);
+        $game = makeGame(['0 3 1 0']);
+
+        $game->day = 17;
+        $this->assertCount(0, $strategy->filterTrees($game));
+
+        $game->day--;
+        $this->assertCount(1, $strategy->filterTrees($game));
     }
 
     public function dataMatch()
