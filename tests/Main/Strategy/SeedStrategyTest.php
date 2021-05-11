@@ -108,7 +108,7 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
         $game = makeGame($trees);
         $game->actions = makeActions($actions);
 
-        $this->assertSame($expected, $strategy->action($game)->params);
+        $this->assertSame($expected, $strategy->action($game)->params, json_encode(func_get_args()));
     }
 
     public function dataScore()
@@ -127,13 +127,13 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
         $game = makeGame($trees);
         $game->actions = makeActions($actions);
 
-        $this->assertSame($expected, $strategy->countScore($game, $game->trees->byIndex($index))->params[0]);
+        $this->assertSame($expected, $strategy->countScore($game, $game->trees->byIndex($index))->params[0], json_encode(func_get_args()));
     }
 
     public function dataCellScore()
     {
         // basic soil 3 + neigh
-        yield [3, 0, ['0 1 1 0', '1 1 1 0']];
+        yield [2, 0, ['0 1 1 0', '1 1 1 0']];
         // basic soil 2 + neigh
         yield [1, 7, ['7 1 1 0', '1 1 1 0']];
         // basic soil 2 + neigh seed
@@ -149,6 +149,6 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
         $strategy = new SeedStrategy($field);
         $game = makeGame($trees);
 
-        $this->assertSame($expected, $strategy->countCellScore($game, $index)->score);
+        $this->assertSame($expected, $strategy->countCellScore($game, $index)->score, json_encode(func_get_args()));
     }
 }

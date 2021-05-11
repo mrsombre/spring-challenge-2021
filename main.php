@@ -568,19 +568,7 @@ final class SeedStrategy extends AbstractScoreStrategy
     public function isActive(Game $game): bool
     {
         $cost = $game->countSeedCost();
-        if ($cost === 0) {
-            return true;
-        }
-
-        if ($cost > $game->me->sun) {
-            return false;
-        }
-
-        if ($game->getDaysRemaining() <= 6) {
-            return false;
-        }
-
-        if ($cost > 1) {
+        if ($cost > 0) {
             return false;
         }
 
@@ -641,7 +629,7 @@ final class SeedStrategy extends AbstractScoreStrategy
         foreach ($neighs as $neigh) {
             // neigh trees
             $tree = $game->trees->byIndex($neigh->index);
-            if ($tree && $cell->richness < 3) {
+            if ($tree) {
                 $score -= $tree->size;
             }
         }
@@ -688,7 +676,7 @@ final class ChopStrategy extends AbstractScoreStrategy
         }
 
         $bySize = $game->countTreesBySize();
-        if ($bySize[self::CHOP_SIZE] < 4) {
+        if ($bySize[self::CHOP_SIZE] < 5) {
             return false;
         }
 
@@ -836,8 +824,13 @@ class GrowStrategy extends AbstractScoreStrategy
         $score += $cell->richness;
         $score += $target->size;
 
-        if ($cell->richness === 3) {
-            $score++;
+        $neighs = $this->field->neighsByCell($cell);
+        foreach ($neighs as $neigh) {
+            // neigh trees
+            $tree = $game->trees->byIndex($neigh->index);
+            if ($tree) {
+                $score -= $tree->size;
+            }
         }
 
         return new Score($score, $cell->index);

@@ -56,8 +56,6 @@ final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
     public function dataMatch()
     {
         // one
-        yield [0, 0, ['0 3 1 0', '1 3 1 0', '2 3 1 0', '3 3 1 0']];
-        // one
         yield [0, 22, ['0 3 1 0']];
     }
 
