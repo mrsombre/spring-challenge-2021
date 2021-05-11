@@ -42,10 +42,17 @@ final class FieldTest extends \PHPUnit\Framework\TestCase
     {
         $field = makeField();
 
-        $vector = $field->vector(15, 4);
+        $vector = $field->countVector(15, 4);
         $this->assertSame([1 => $field->byIndex(31)], $vector);
 
-        $vector = $field->vector(0, 0);
+        $vector = $field->countVector(0, 0);
         $this->assertSame([1 => $field->byIndex(1), 2 => $field->byIndex(7), 3 => $field->byIndex(19)], $vector);
+    }
+
+    public function testVectorCache()
+    {
+        $field = makeField();
+
+        $this->assertSame($field->countVector(15, 4), $field->vector(15, 4));
     }
 }

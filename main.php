@@ -79,12 +79,23 @@ final class Field
     public const DIRECTION_BOTTOM_LEFT = 4;
     public const DIRECTION_BOTTOM_RIGHT = 5;
 
+    public const DIRECTIONS = [
+        self::DIRECTION_RIGHT,
+        self::DIRECTION_TOP_RIGHT,
+        self::DIRECTION_TOP_LEFT,
+        self::DIRECTION_LEFT,
+        self::DIRECTION_BOTTOM_LEFT,
+        self::DIRECTION_BOTTOM_RIGHT,
+    ];
+
     /** @var \App\Cell[] */
     public $cells;
     /** @var int */
     public $numberOfCells;
     /** array */
     public $neighs;
+    /** array */
+    public $vectors;
 
     public static function fromStream($stream): self
     {
@@ -115,6 +126,13 @@ final class Field
 
         $this->cells = $cellsIndexed;
         $this->numberOfCells = count($this->cells);
+
+        // count vectors
+        foreach ($cellsIndexed as $cell) {
+            foreach (self::DIRECTIONS as $direction) {
+                $this->vectors[$cell->index][$direction] = $this->countVector($cell->index, $direction);
+            }
+        }
     }
 
     public function byIndex($index): Cell
@@ -142,7 +160,7 @@ final class Field
      * @param int $direction
      * @return \App\Cell[]
      */
-    public function vector(int $index, int $direction): array
+    public function countVector(int $index, int $direction): array
     {
         $result = [];
         $distance = 1;
@@ -155,6 +173,11 @@ final class Field
         }
 
         return $result;
+    }
+
+    public function vector(int $index, int $direction): array
+    {
+        return $this->vectors[$index][$direction];
     }
 }
 
@@ -857,7 +880,7 @@ class Shadow
         $spooky = $target->size ?? 0;
 
         $sun = $this->sunDirection($day);
-        $vector = $this->field->vector($index, $this->field->oppositeDirection($sun));
+        $vector = $this->field->countVector($index, $this->field->oppositeDirection($sun));
 
         foreach ($vector as $distance => $cell) {
             $tree = $this->game->trees->byIndex($cell->index);
