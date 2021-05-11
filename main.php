@@ -646,7 +646,6 @@ final class SeedStrategy extends AbstractScoreStrategy
                     $score++;
                     continue;
                 }
-                $score -= $neigh->size - 1;
             }
         }
 
@@ -724,8 +723,9 @@ final class ChopStrategy extends AbstractScoreStrategy
         $score = 0;
         $score += $cell->richness;
 
-        if ($cell->richness === 3) {
-            $score++;
+        $shadow = new Shadow($this->field, $game);
+        if ($shadow->isShadow($cell->index, $game->day + 1)) {
+            $score += 3;
         }
 
         return new Score($score, $cell->index);
