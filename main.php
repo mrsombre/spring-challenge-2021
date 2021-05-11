@@ -72,45 +72,49 @@ trait Cache
 
 final class Field
 {
+    public const DIRECTION_RIGHT = 0;
+    public const DIRECTION_TOP_RIGHT = 1;
+    public const DIRECTION_TOP_LEFT = 2;
+    public const DIRECTION_LEFT = 3;
+    public const DIRECTION_BOTTOM_LEFT = 4;
+    public const DIRECTION_BOTTOM_RIGHT = 5;
+
     /** @var \App\Cell[] */
     public $cells;
     /** @var int */
     public $numberOfCells;
+    /** array */
+    public $neighs;
 
     public static function fromStream($stream): self
     {
         fscanf($stream, '%d', $num);
-
-        $cells = [];
+        $cellsData = [];
         for ($i = 0; $i < $num; $i++) {
-            $cells[] = Cell::factory(...fscanf($stream, '%d %d %d %d %d %d %d %d'));
+            $cellsData[] = fscanf($stream, '%d %d %d %d %d %d %d %d');
         }
 
-        return new self($cells);
+        return new self($cellsData);
     }
 
-    /**
-     * @param \App\Cell[] $cells
-     */
-    public function __construct(array $cells)
+    public function __construct(array $cellsData)
     {
         $cellsIndexed = [];
         // base cells
-        foreach ($cells as $cell) {
-            $cellsIndexed[$cell->index] = $cell;
-        }
-        // neighs
-        foreach ($cellsIndexed as $cell) {
-            foreach ($cell->neighs as $index => $neighCell) {
-                if ($neighCell === -1) {
-                    continue;
+        foreach ($cellsData as $datum) {
+            $cellsIndexed[$datum[0]] = Cell::factory($datum[0], $datum[1]);
+            $neighs = array_slice($datum, 2);
+            $neighs = array_filter(
+                $neighs,
+                function ($value) {
+                    return $value !== -1;
                 }
-                $cell->neighCells[$index] = $cellsIndexed[$neighCell];
-            }
+            );
+            $this->neighs[$datum[0]] = $neighs;
         }
 
         $this->cells = $cellsIndexed;
-        $this->numberOfCells = count($cells);
+        $this->numberOfCells = count($this->cells);
     }
 
     public function byIndex($index): Cell
@@ -118,19 +122,14 @@ final class Field
         return $this->cells[$index];
     }
 
-    /**
-     * @return \App\Cell[]
-     */
-    public function neighsByCell(Cell $cell): array
+    public function neighs(int $index): array
     {
-        $neighs = [];
-        foreach ($cell->neighs as $index) {
-            if ($index === -1) {
-                continue;
-            }
-            $neighs[$index] = $this->byIndex($index);
-        }
-        return $neighs;
+        return $this->neighs[$index];
+    }
+
+    public function neigh(int $index, int $direction): ?int
+    {
+        return $this->neighs[$index][$direction] ?? null;
     }
 
     public function oppositeDirection(int $direction): int
@@ -139,16 +138,16 @@ final class Field
     }
 
     /**
-     * @param \App\Cell $cell
+     * @param int $index
      * @param int $direction
      * @return \App\Cell[]
      */
-    public function vector(Cell $cell, int $direction): array
+    public function vector(int $index, int $direction): array
     {
         $result = [];
         $distance = 1;
-        while (($cell = $cell->neight($direction)) !== null) {
-            $result[$distance] = $cell;
+        while (($index = $this->neigh($index, $direction)) !== null) {
+            $result[$distance] = $this->byIndex($index);
             if (count($result) === 3) {
                 break;
             }
@@ -165,27 +164,16 @@ final class Cell
     public $index;
     /** @var int */
     public $richness;
-    /** @var int[] */
-    public $neighs;
 
-    /** @var \App\Cell[] */
-    public $neighCells;
-
-    public static function factory(int $index, int $richness, int ...$neighs): self
+    public static function factory(int $index, int $richness): self
     {
-        return new self($index, $richness, $neighs);
+        return new self($index, $richness);
     }
 
-    public function __construct(int $index, int $richness, array $neighs)
+    public function __construct(int $index, int $richness)
     {
         $this->index = $index;
         $this->richness = $richness;
-        $this->neighs = $neighs;
-    }
-
-    public function neight(int $direction): ?Cell
-    {
-        return $this->neighCells[$direction] ?? null;
     }
 }
 
@@ -625,10 +613,10 @@ final class SeedStrategy extends AbstractScoreStrategy
         $score = 0;
         $score += $cell->richness;
 
-        $neighs = $this->field->neighsByCell($cell);
+        $neighs = $this->field->neighs($index);
         foreach ($neighs as $neigh) {
             // neigh trees
-            $tree = $game->trees->byIndex($neigh->index);
+            $tree = $game->trees->byIndex($neigh);
             if ($tree) {
                 $score -= $tree->size;
             }
@@ -713,9 +701,9 @@ final class ChopStrategy extends AbstractScoreStrategy
         }
 
         // neigh trees
-        $neighs = $this->field->neighsByCell($cell);
+        $neighs = $this->field->neighs($cell->index);
         foreach ($neighs as $neigh) {
-            $tree = $game->trees->byIndex($neigh->index);
+            $tree = $game->trees->byIndex($neigh);
             if (!$tree) {
                 continue;
             }
@@ -824,10 +812,10 @@ class GrowStrategy extends AbstractScoreStrategy
         $score += $cell->richness;
         $score += $target->size;
 
-        $neighs = $this->field->neighsByCell($cell);
+        $neighs = $this->field->neighs($cell->index);
         foreach ($neighs as $neigh) {
             // neigh trees
-            $tree = $game->trees->byIndex($neigh->index);
+            $tree = $game->trees->byIndex($neigh);
             if ($tree) {
                 $score -= $tree->size;
             }
@@ -858,19 +846,18 @@ class Shadow
         $this->game = $game;
     }
 
-    public function countSunDirection(int $day): int
+    public function sunDirection(int $day): int
     {
         return $day % 6;
     }
 
     public function isShadow(int $index, int $day): bool
     {
-        $cell = $this->field->byIndex($index);
         $target = $this->game->trees->byIndex($index);
         $spooky = $target->size ?? 0;
 
-        $sun = $this->countSunDirection($day);
-        $vector = $this->field->vector($cell, $this->field->oppositeDirection($sun));
+        $sun = $this->sunDirection($day);
+        $vector = $this->field->vector($index, $this->field->oppositeDirection($sun));
 
         foreach ($vector as $distance => $cell) {
             $tree = $this->game->trees->byIndex($cell->index);

@@ -22,8 +22,9 @@ final class FieldTest extends \PHPUnit\Framework\TestCase
         $this->assertSame(0, $field->byIndex(0)->index);
         $this->assertSame(3, $field->byIndex(0)->richness);
 
-        $this->assertSame([1, 2, 3, 4, 5, 6], $field->byIndex(0)->neighs);
-        $this->assertSame($field->byIndex(1), $field->byIndex(0)->neighCells[0]);
+        $this->assertSame([1, 2, 3, 4, 5, 6], $field->neighs(0));
+        $this->assertSame(36, $field->neigh(7, Field::DIRECTION_BOTTOM_RIGHT));
+        $this->assertSame(0, $field->neigh(1, Field::DIRECTION_LEFT));
     }
 
     public function testOppositeDirection()
@@ -41,10 +42,10 @@ final class FieldTest extends \PHPUnit\Framework\TestCase
     {
         $field = makeField();
 
-        $vector = $field->vector($field->byIndex(15), 4);
+        $vector = $field->vector(15, 4);
         $this->assertSame([1 => $field->byIndex(31)], $vector);
 
-        $vector = $field->vector($field->byIndex(0), 0);
+        $vector = $field->vector(0, 0);
         $this->assertSame([1 => $field->byIndex(1), 2 => $field->byIndex(7), 3 => $field->byIndex(19)], $vector);
     }
 }
