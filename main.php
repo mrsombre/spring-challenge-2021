@@ -767,6 +767,7 @@ class GrowStrategy extends AbstractScoreStrategy
     public function filterTrees(Game $game): array
     {
         $trees = $game->trees->getMine();
+
         $cost = $game->countGrowCost();
 
         $available = array_filter(
@@ -789,12 +790,6 @@ class GrowStrategy extends AbstractScoreStrategy
         }
 
         $choosen = $this->chooseSize($available);
-        // prefer seed
-        $treesBySize = $game->countTreesBySize();
-        if ($treesBySize[0] < 2 && $game->getDaysRemaining() >= 6) {
-            l('Seed preffered');
-            return [];
-        }
 
         return $choosen['trees'];
     }
@@ -904,7 +899,7 @@ if ($_ENV['APP_ENV'] !== 'prod') {
     return;
 }
 
-$_ENV['VERBOSE'] = true;
+$_ENV['VERBOSE'] = false;
 
 $field = Field::fromStream(STDIN);
 

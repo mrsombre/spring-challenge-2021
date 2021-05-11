@@ -81,16 +81,6 @@ final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals(Action::factory(Action::TYPE_GROW, $expected), $strategy->action($game), json_encode(func_get_args()));
     }
 
-    public function testChooseSeed()
-    {
-        $field = makeField();
-        $strategy = new GrowStrategy($field);
-        $game = makeGame(['6 1 1 1', '17 0 1 0', '34 1 1 0', '5 3 1 0', '15 2 1 0', '31 2 1 0',]);
-        $game->me->sun = 5;
-
-        $this->assertNull($strategy->action($game));
-    }
-
     public function dataScore()
     {
         // 3 soil + 0 size
@@ -109,6 +99,6 @@ final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
         $strategy = new GrowStrategy($field);
         $game = makeGame($trees);
 
-        $this->assertSame($expected, $strategy->countScore($game, $game->trees->byIndex($index))->score);
+        $this->assertSame($expected, $strategy->countScore($game, $game->trees->byIndex($index))->score, json_encode(func_get_args()));
     }
 }
