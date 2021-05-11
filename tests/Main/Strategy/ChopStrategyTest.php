@@ -50,33 +50,37 @@ final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
         $strategy = new ChopStrategy($field);
         $game = makeGame($trees);
 
-        $this->assertCount($expected, $strategy->filterTrees($game));
+        $this->assertCount($expected, $strategy->filterTrees($game), json_encode(func_get_args()));
     }
 
     public function dataMatch()
     {
         // one
-        yield [0, 4, ['0 3 1 0']];
+        yield [0, 0, ['0 3 1 0', '1 3 1 0', '2 3 1 0', '3 3 1 0']];
+        // one
+        yield [0, 22, ['0 3 1 0']];
     }
 
     /**
      * @dataProvider dataMatch
      */
-    public function testMatch(int $expected, int $sun, array $trees)
+    public function testMatch(int $expected, int $day, array $trees)
     {
         $field = makeField();
         $strategy = new ChopStrategy($field);
         $game = makeGame($trees);
-        $game->me->sun = $sun;
-        $game->day = 23;
+        $game->day = $day;
+        $game->me->sun = 4;
 
-        $this->assertEquals(Action::factory(Action::TYPE_COMPLETE, $expected), $strategy->action($game));
+        $this->assertEquals(Action::factory(Action::TYPE_COMPLETE, $expected), $strategy->action($game), json_encode(func_get_args()));
     }
 
     public function dataScore()
     {
         yield [4, 0, ['0 3 1 0']];
         yield [2, 7, ['7 3 1 0']];
+        yield [3, 7, ['7 3 1 0', '1 3 1 0']];
+        yield [1, 7, ['7 3 1 0', '1 3 0 0']];
     }
 
     /**
@@ -88,6 +92,6 @@ final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
         $strategy = new ChopStrategy($field);
         $game = makeGame($trees);
 
-        $this->assertSame($expected, $strategy->countScore($game, $game->trees->byIndex($index))->score);
+        $this->assertSame($expected, $strategy->countScore($game, $game->trees->byIndex($index))->score, json_encode(func_get_args()));
     }
 }

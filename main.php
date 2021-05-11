@@ -674,12 +674,21 @@ final class SeedStrategy extends AbstractScoreStrategy
 
 final class ChopStrategy extends AbstractScoreStrategy
 {
-    public const MIN_LEVEL = 3;
+    public const CHOP_SIZE = 3;
     public const SUN_COST = 4;
 
     public function isActive(Game $game): bool
     {
         if (self::SUN_COST > $game->me->sun) {
+            return false;
+        }
+
+        if ($game->getDaysRemaining() < 2) {
+            return true;
+        }
+
+        $bySize = $game->countTreesBySize();
+        if ($bySize[self::CHOP_SIZE] < 4) {
             return false;
         }
 
@@ -693,7 +702,7 @@ final class ChopStrategy extends AbstractScoreStrategy
         return array_filter(
             $trees,
             function (Tree $tree) {
-                if ($tree->size < self::MIN_LEVEL) {
+                if ($tree->size < self::CHOP_SIZE) {
                     return false;
                 }
                 if ($tree->isDormant) {
@@ -713,6 +722,23 @@ final class ChopStrategy extends AbstractScoreStrategy
 
         if ($cell->richness === 3) {
             $score++;
+        }
+
+        // neigh trees
+        $neighs = $this->field->neighsByCell($cell);
+        foreach ($neighs as $neigh) {
+            $tree = $game->trees->byIndex($neigh->index);
+            if (!$tree) {
+                continue;
+            }
+            if ($tree->isMine && $target->size >= $tree->size) {
+                $score++;
+                continue;
+            }
+            if (!$tree->isMine && $target->size <= $tree->size) {
+                $score--;
+                continue;
+            }
         }
 
         return new Score($score, $cell->index);
@@ -885,6 +911,7 @@ $field = Field::fromStream(STDIN);
 $strategy = new CompositeStrategy(
     $field,
     [
+        new ChopStrategy($field),
         new GrowStrategy($field),
         new SeedStrategy($field),
     ]
