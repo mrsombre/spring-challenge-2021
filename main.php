@@ -175,6 +175,11 @@ final class Field
         return $result;
     }
 
+    /**
+     * @param int $index
+     * @param int $direction
+     * @return \App\Cell[]
+     */
     public function vector(int $index, int $direction): array
     {
         return $this->vectors[$index][$direction];
@@ -596,9 +601,6 @@ final class SeedStrategy extends AbstractScoreStrategy
                 if ($tree->size === 0) {
                     return false;
                 }
-                if ($tree->size === 3 && $game->getDaysRemaining() <= 6) {
-                    return false;
-                }
                 if ($tree->isDormant) {
                     return false;
                 }
@@ -636,12 +638,15 @@ final class SeedStrategy extends AbstractScoreStrategy
         $score = 0;
         $score += $cell->richness;
 
-        $neighs = $this->field->neighs($index);
-        foreach ($neighs as $neigh) {
-            // neigh trees
-            $tree = $game->trees->byIndex($neigh);
-            if ($tree) {
-                $score -= $tree->size;
+        foreach (Field::DIRECTIONS as $direction) {
+            $vector = $this->field->vector($index, $direction);
+            foreach ($vector as $cell) {
+                $neigh = $game->trees->byIndex($cell->index);
+                if (!$neigh) {
+                    $score++;
+                    continue;
+                }
+                $score -= $neigh->size - 1;
             }
         }
 
@@ -721,23 +726,6 @@ final class ChopStrategy extends AbstractScoreStrategy
 
         if ($cell->richness === 3) {
             $score++;
-        }
-
-        // neigh trees
-        $neighs = $this->field->neighs($cell->index);
-        foreach ($neighs as $neigh) {
-            $tree = $game->trees->byIndex($neigh);
-            if (!$tree) {
-                continue;
-            }
-            if ($tree->isMine && $target->size >= $tree->size) {
-                $score++;
-                continue;
-            }
-            if (!$tree->isMine && $target->size <= $tree->size) {
-                $score--;
-                continue;
-            }
         }
 
         return new Score($score, $cell->index);
