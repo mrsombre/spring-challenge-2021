@@ -571,6 +571,7 @@ final class SeedStrategy extends AbstractScoreStrategy
         if ($cost === 0) {
             return true;
         }
+
         if ($cost > $game->me->sun) {
             return false;
         }
@@ -579,8 +580,7 @@ final class SeedStrategy extends AbstractScoreStrategy
             return false;
         }
 
-        $growCost = $game->countGrowCost();
-        if ($cost > $growCost[0]) {
+        if ($cost > 1) {
             return false;
         }
 
