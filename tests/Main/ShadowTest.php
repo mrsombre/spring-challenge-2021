@@ -35,7 +35,7 @@ final class ShadowTest extends \PHPUnit\Framework\TestCase
     public function dataIsShadow()
     {
         // basic
-//        yield [true, 1, 15, ['15 1 0 0', '31 1 0 0']];
+        yield [true, 1, 15, ['15 1 0 0', '31 1 0 0']];
         // long
         yield [true, 6, 19, ['19 3 0 0', '0 3 0 0']];
         // no spooky
@@ -52,5 +52,25 @@ final class ShadowTest extends \PHPUnit\Framework\TestCase
         $shadow = new Shadow($field, $game);
 
         $this->assertSame($expected, $shadow->isShadow($index, $day), json_encode(func_get_args()));
+    }
+
+    public function dataShadowVector()
+    {
+        yield [[], 6, 0, ['28 1 1 0']];
+        yield [[13], 0, 28, ['28 1 1 0']];
+        yield [[13, 4], 0, 28, ['28 2 1 0']];
+        yield [[13, 4, 0], 0, 28, ['28 3 1 0']];
+    }
+
+    /**
+     * @dataProvider dataShadowVector
+     */
+    public function testShadowVector(array $expected, int $day, int $index, array $trees)
+    {
+        $field = makeField();
+        $game = makeGame($trees);
+        $shadow = new Shadow($field, $game);
+
+        $this->assertSame($expected, $shadow->shadowVector($index, $day), json_encode(func_get_args()));
     }
 }

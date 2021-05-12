@@ -75,10 +75,10 @@ final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
 
     public function dataScore()
     {
-        yield [4, 0, ['0 3 1 0']];
+        yield [3, 0, ['0 3 1 0']];
         yield [2, 7, ['7 3 1 0']];
-        yield [3, 7, ['7 3 1 0', '1 3 1 0']];
-        yield [1, 7, ['7 3 1 0', '1 3 0 0']];
+        yield [2, 7, ['7 3 1 0', '1 3 1 0']];
+        yield [2, 7, ['7 3 1 0', '1 3 0 0']];
     }
 
     /**
@@ -90,6 +90,6 @@ final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
         $strategy = new ChopStrategy($field);
         $game = makeGame($trees);
 
-        $this->assertSame($expected, $strategy->countScore($game, $game->trees->byIndex($index))->score, json_encode(func_get_args()));
+        $this->assertSame($expected, $strategy->countScore($game, $game->tree($index))->score, json_encode(func_get_args()));
     }
 }

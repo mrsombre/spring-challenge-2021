@@ -7,7 +7,6 @@ namespace Tests;
 use App\Field;
 use App\Game;
 use App\Player;
-use App\Trees;
 use App\Tree;
 use App\Action;
 
@@ -33,6 +32,8 @@ function makeField(string $file = null): Field
 
 function makeGame(array $treesData = []): Game
 {
+    $field = makeField();
+
     $trees = [];
     foreach ($treesData as $tree) {
         if (is_string($tree)) {
@@ -48,11 +49,12 @@ function makeGame(array $treesData = []): Game
     }
 
     return new Game(
+        $field,
         0,
         20,
         Player::factory(),
         Player::factory(),
-        new Trees($trees),
+        $trees,
         []
     );
 }

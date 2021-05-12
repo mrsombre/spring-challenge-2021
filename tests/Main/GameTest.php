@@ -6,8 +6,8 @@ namespace Tests\Main;
 
 use App\Game;
 use App\Action;
-use App\Tree;
 
+use function Tests\makeField;
 use function Tests\streamFromString;
 use function Tests\makeGame;
 
@@ -15,9 +15,10 @@ final class GameTest extends \PHPUnit\Framework\TestCase
 {
     public function testFactory()
     {
+        $field = makeField();
         $fixture = file_get_contents(__DIR__ . '/../fixtures/step.txt');
-
-        $game = Game::fromStream(streamFromString($fixture));
+        $stream = streamFromString($fixture);
+        $game = Game::fromStream($stream, $field);
 
         $this->assertSame(0, $game->day);
         $this->assertSame(20, $game->nutrients);
@@ -28,11 +29,15 @@ final class GameTest extends \PHPUnit\Framework\TestCase
         $this->assertSame(2, $game->opp->score);
         $this->assertSame(false, $game->opp->isWaiting);
 
-        $this->assertSame(12, $game->trees->numberOfTrees);
-        $this->assertSame(7, $game->trees->byIndex(7)->index);
-        $this->assertSame(3, $game->trees->byIndex(7)->size);
-        $this->assertSame(false, $game->trees->byIndex(7)->isMine);
-        $this->assertSame(false, $game->trees->byIndex(7)->isDormant);
+        $this->assertSame(12, count($game->trees));
+        $this->assertSame(7, $game->tree(7)->index);
+        $this->assertSame(3, $game->tree(7)->size);
+        $this->assertFalse($game->tree(7)->isMine);
+        $this->assertFalse($game->tree(7)->isDormant);
+        $this->assertArrayHasKey(12, $game->mine);
+        $this->assertEquals(6, $game->countTreesBySize(true)[3]);
+        $this->assertEquals(0, $game->countTreesBySize(true)[0]);
+        $this->assertEquals(6, $game->countTreesBySize(false)[3]);
 
         $this->assertSame(7, count($game->actions));
         $this->assertSame('WAIT', $game->actions[0]->type);
@@ -45,7 +50,7 @@ final class GameTest extends \PHPUnit\Framework\TestCase
         yield [1, 0, ['0 0 1 0']];
         yield [2, 0, ['0 1 1 0']];
 
-        // size 1
+        // size 1~
         yield [3, 1, ['0 1 1 0']];
         yield [4, 1, ['0 2 1 0']];
 
@@ -61,7 +66,7 @@ final class GameTest extends \PHPUnit\Framework\TestCase
     {
         $game = makeGame($trees);
 
-        $this->assertSame($expected, $game->countGrowCost()[$size]);
+        $this->assertSame($expected, $game->countGrowCost()[$size], json_encode(func_get_args()));
     }
 
     public function dataCountSeedCost()
@@ -77,25 +82,21 @@ final class GameTest extends \PHPUnit\Framework\TestCase
     {
         $game = makeGame($trees);
 
-        $this->assertSame($expected, $game->countSeedCost());
+        $this->assertSame($expected, $game->countSeedCost(), json_encode(func_get_args()));
     }
 
-    public function testCountTreesBySize()
+    public function dataCountTreesBySize()
     {
-        $game = makeGame(
-            [
-                '0 0 1 0',
-                '1 1 1 0',
-                '2 2 1 0',
-                '3 3 1 0',
-            ]
-        );
-        $treesBySize = $game->countTreesBySize();
+        yield [[0 => 1, 1 => 0, 2 => 0, 3 => 0], ['0 0 1 0']];
+    }
 
-        $this->assertCount(count(Tree::SIZE), $treesBySize);
-        $this->assertSame(1, $treesBySize[0]);
-        $this->assertSame(1, $treesBySize[1]);
-        $this->assertSame(1, $treesBySize[2]);
-        $this->assertSame(1, $treesBySize[3]);
+    /**
+     * @dataProvider dataCountTreesBySize
+     */
+    public function testCountTreesBySize(array $expected, array $trees)
+    {
+        $game = makeGame($trees);
+
+        $this->assertSame($expected, $game->countTreesBySize());
     }
 }

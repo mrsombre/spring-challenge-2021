@@ -9,24 +9,21 @@ use App\AbstractStrategy;
 use App\Game;
 use App\Action;
 
-use function Tests\makeField;
 use function Tests\makeGame;
 
 final class CompositeStrategyTest extends \PHPUnit\Framework\TestCase
 {
     public function testAction()
     {
-        $field = makeField();
         $strategy = new CompositeStrategy(
-            $field,
             [
-                new class($field) extends AbstractStrategy {
+                new class() extends AbstractStrategy {
                     public function action(Game $game): ?Action
                     {
                         return null;
                     }
                 },
-                new class($field) extends AbstractStrategy {
+                new class() extends AbstractStrategy {
                     public function action(Game $game): ?Action
                     {
                         return Action::factory();
