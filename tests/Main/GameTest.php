@@ -40,8 +40,8 @@ final class GameTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals(6, $game->countTreesBySize(false)[3]);
 
         $this->assertSame(7, count($game->actions));
-        $this->assertSame('WAIT', $game->actions[0]->type);
-        $this->assertEquals(Action::factory(Action::TYPE_COMPLETE, 22), $game->actions[1]);
+        $this->assertSame('WAIT', $game->actions[0]);
+        $this->assertEquals('COMPLETE 22', $game->actions[1]);
     }
 
     public function dataCountGrowCost()

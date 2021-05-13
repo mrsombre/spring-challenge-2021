@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Main\Strategy;
 
-use App\Action;
 use App\ChopStrategy;
 
 use function Tests\makeField;
@@ -23,10 +22,9 @@ final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
      */
     public function testIsActive(int $sun, array $trees)
     {
-        $field = makeField();
-        $strategy = new ChopStrategy($field);
         $game = makeGame($trees);
         $game->me->sun = $sun;
+        $strategy = new ChopStrategy($game);
 
         $this->assertFalse($strategy->isActive($game), json_encode(func_get_args()));
     }
@@ -46,50 +44,26 @@ final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
      */
     public function testFilter(int $expected, array $trees)
     {
-        $field = makeField();
-        $strategy = new ChopStrategy($field);
         $game = makeGame($trees);
+        $strategy = new ChopStrategy($game);
 
         $this->assertCount($expected, $strategy->filterTrees($game), json_encode(func_get_args()));
     }
 
-    public function dataMatch()
-    {
-        // one
-        yield [0, 22, ['0 3 1 0']];
-    }
-
-    /**
-     * @dataProvider dataMatch
-     */
-    public function testMatch(int $expected, int $day, array $trees)
-    {
-        $field = makeField();
-        $strategy = new ChopStrategy($field);
-        $game = makeGame($trees);
-        $game->day = $day;
-        $game->me->sun = 4;
-
-        $this->assertEquals(Action::factory(Action::TYPE_COMPLETE, $expected), $strategy->action($game), json_encode(func_get_args()));
-    }
-
     public function dataScore()
     {
-        yield [3, 0, ['0 3 1 0']];
-        yield [2, 7, ['7 3 1 0']];
-        yield [2, 7, ['7 3 1 0', '1 3 1 0']];
-        yield [2, 7, ['7 3 1 0', '1 3 0 0']];
+        yield [null, 0, ['0 3 1 0']];
     }
 
     /**
      * @dataProvider dataScore
      */
-    public function testScore(int $expected, int $index, array $trees)
+    public function testScore($expected, int $index, array $trees)
     {
-        $field = makeField();
-        $strategy = new ChopStrategy($field);
         $game = makeGame($trees);
+        $game->me->sun = 4;
+        $strategy = new ChopStrategy($game);
 
-        $this->assertSame($expected, $strategy->countScore($game, $game->tree($index))->score, json_encode(func_get_args()));
+        $this->assertSame($expected, $strategy->action($game)->params[0] ?? null, json_encode(func_get_args()));
     }
 }

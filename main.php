@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App;
 
-use RecursiveArrayIterator;
-use RecursiveIteratorIterator;
-use SplMaxHeap;
+use InvalidArgumentException;
 
 function l($message)
 {
@@ -58,6 +56,12 @@ final class Field
         self::DIRECTION_LEFT,
         self::DIRECTION_BOTTOM_LEFT,
         self::DIRECTION_BOTTOM_RIGHT,
+    ];
+
+    public const CELL_SCORE = [
+        1 => 0,
+        2 => 2,
+        3 => 4,
     ];
 
     /** @var int[] */
@@ -135,9 +139,14 @@ final class Field
         }
     }
 
-    public function byIndex($index): int
+    public function byIndex(int $index): int
     {
         return $this->cells[$index];
+    }
+
+    public function score(int $index): int
+    {
+        return self::CELL_SCORE[$this->byIndex($index)];
     }
 
     /**
@@ -232,7 +241,7 @@ final class Game
         fscanf($stream, '%d', $num);
         $actions = [];
         for ($i = 0; $i < $num; $i++) {
-            $actions[] = Action::factory(...fscanf($stream, '%s %d %d'));
+            $actions[] = stream_get_line($stream, 32, "\n");
         }
 
         return new self(
@@ -313,6 +322,11 @@ final class Game
     {
         return self::DAYS - $this->day - 1;
     }
+
+    public function countCellScore(int $index): int
+    {
+        return $this->field->score($index) + $this->nutrients;
+    }
 }
 
 final class Player
@@ -376,7 +390,7 @@ final class Action
     /** @var int[] */
     public $params = [];
 
-    public static function factory(string $action = self::TYPE_WAIT, ?int ...$params): self
+    public static function factory(string $action = self::TYPE_WAIT, ...$params): self
     {
         $params = array_filter(
             $params,
@@ -439,32 +453,7 @@ final class CompositeStrategy extends AbstractStrategy
     }
 }
 
-class Score
-{
-    /** @var int */
-    public $score;
-    /** @var int */
-    public $target;
-    /** @var array */
-    public $params;
-
-    public function __construct(int $score, int $target, ...$params)
-    {
-        $this->score = $score;
-        $this->target = $target;
-        $this->params = $params;
-    }
-}
-
-class ScoreMaxHeap extends SplMaxHeap
-{
-    protected function compare($value1, $value2)
-    {
-        return $value1->score <=> $value2->score;
-    }
-}
-
-abstract class AbstractScoreStrategy extends AbstractStrategy
+final class SeedStrategy extends AbstractStrategy
 {
     public function action(Game $game): ?Action
     {
@@ -477,23 +466,49 @@ abstract class AbstractScoreStrategy extends AbstractStrategy
             return null;
         }
 
-        $heap = new ScoreMaxHeap();
+        $cells = [];
+        $cellsToTree = [];
         foreach ($trees as $tree) {
-            $score = $this->countScore($game, $tree);
-            if (!$score) {
-                continue;
+            $find = $this->findCells($game, $tree);
+            foreach ($find as $cell) {
+                $cells[$cell] = ['index' => $cell, 'score' => $this->countCellScore($game, $cell)];
+                $cellsToTree[$cell][] = $tree;
             }
-            $heap->insert($score);
-        }
-        if ($heap->isEmpty()) {
-            return null;
         }
 
-        return $this->factory($heap->top());
+        usort(
+            $cells,
+            function (array $a, array $b) use ($game) {
+                $sort = $b['score'] <=> $a['score'];
+
+                return $sort;
+            }
+        );
+        $bestCell = array_shift($cells)['index'];
+
+        $bestTrees = $cellsToTree[$bestCell];
+        usort(
+            $bestTrees,
+            function (Tree $a, Tree $b) use ($game) {
+                $sort = $b->size <=> $a->size;
+
+                return $sort;
+            }
+        );
+        $bestTree = array_shift($bestTrees);
+
+        return $this->factory($bestTree->index, $bestCell);
     }
 
     public function isActive(Game $game): bool
     {
+        $cost = $game->countSeedCost();
+        if ($cost > 0) {
+            return false;
+        }
+        if ($game->countDaysRemaining() < 2) {
+            return false;
+        }
         return true;
     }
 
@@ -501,34 +516,15 @@ abstract class AbstractScoreStrategy extends AbstractStrategy
      * @param \App\Game $game
      * @return \App\Tree[]
      */
-    abstract public function filterTrees(Game $game): array;
-
-    abstract public function countScore(Game $game, Tree $target): ?Score;
-
-    abstract public function factory(Score $score): ?Action;
-}
-
-final class SeedStrategy extends AbstractScoreStrategy
-{
-    public function isActive(Game $game): bool
-    {
-        $cost = $game->countSeedCost();
-        if ($cost > 0) {
-            return false;
-        }
-
-        return true;
-    }
-
     public function filterTrees(Game $game): array
     {
         return array_filter(
             $game->mine,
             function (Tree $tree) use ($game) {
-                if ($tree->size !== 3) {
+                if ($tree->isDormant) {
                     return false;
                 }
-                if ($tree->isDormant) {
+                if ($tree->size < 2) {
                     return false;
                 }
                 return true;
@@ -536,61 +532,20 @@ final class SeedStrategy extends AbstractScoreStrategy
         );
     }
 
-    public function countScore(Game $game, Tree $target): ?Score
-    {
-        $cells = $this->findCells($game, $target);
-        if ($cells === []) {
-            return null;
-        }
-
-        $heap = new ScoreMaxHeap();
-        foreach ($cells as $index) {
-            $score = $this->countCellScore($game, $index);
-            if (!$score) {
-                continue;
-            }
-            $heap->insert($score);
-        }
-        if ($heap->isEmpty()) {
-            return null;
-        }
-
-        return new Score($heap->top()->score, $target->index, $heap->top()->target);
-    }
-
-    public function countCellScore(Game $game, int $index): ?Score
+    public function countCellScore(Game $game, int $index): int
     {
         $score = 0;
-        $score += $game->field->byIndex($index);
+//        $score += $game->countCellScore($index);
+        $score += ceil($game->shadow->countSun($index, 0, 4) / 3);
 
-        foreach (Field::DIRECTIONS as $direction) {
-            $vector = $game->field->vector($index, $direction);
-            foreach ($vector as $cell) {
-                $tree = $game->tree($cell);
-                if ($tree !== null) {
-                    $score--;
-                    break;
-                }
-            }
-        }
-
-        foreach (range($game->day + 2, min($game->countDaysRemaining(), 5)) as $day) {
-            if ($game->shadow->isShadow($index, $day)) {
-                $score--;
-            }
-        }
-
-        return new Score($score, $index);
+        return (int) $score;
     }
 
-    public function factory(Score $score): ?Action
-    {
-        l(__CLASS__);
-        l($score->score);
-
-        return Action::factory(Action::TYPE_SEED, $score->target, $score->params[0]);
-    }
-
+    /**
+     * @param \App\Game $game
+     * @param \App\Tree $target
+     * @return int[]
+     */
     public function findCells(Game $game, Tree $target): array
     {
         $available = [];
@@ -607,31 +562,147 @@ final class SeedStrategy extends AbstractScoreStrategy
         }
         return $available;
     }
+
+    public function factory(int $tree, int $target): Action
+    {
+        return Action::factory(Action::TYPE_SEED, $tree, $target);
+    }
 }
 
-final class ChopStrategy extends AbstractScoreStrategy
+class GrowStrategy extends AbstractStrategy
 {
-    public const CHOP_SIZE = 3;
-    public const SUN_COST = 4;
+    public const MAX_LEVEL = 3;
 
-    public function isActive(Game $game): bool
+    public function action(Game $game): ?Action
     {
-        if (self::SUN_COST > $game->me->sun) {
-            return false;
-        }
-
-        if ($game->countDaysRemaining() < 2) {
-            return true;
+        $trees = $this->filterTrees($game);
+        if ($trees === []) {
+            return null;
         }
 
         $bySize = $game->countTreesBySize();
-        if ($bySize[self::CHOP_SIZE] < 5) {
-            return false;
+        $treesScore = [];
+        foreach ($trees as $tree) {
+            $score = ceil($game->shadow->countSun($tree->index, $tree->size, 4) / 3);
+
+            $treesScore[] = [
+                'tree' => $tree,
+                'score' => $score,
+            ];
         }
 
+        usort(
+            $treesScore,
+            function (array $a, array $b) use ($game, $bySize) {
+                $sort = 0;
+                $sort = $bySize[$b['tree']->size] <=> $bySize[$a['tree']->size];
+                if ($sort === 0) {
+                    $sort = $b['tree']->size <=> $a['tree']->size;
+                }
+                if ($sort === 0) {
+                    $sort = $b['score'] <=> $a['score'];
+                }
+                return $sort;
+            }
+        );
+        $best = array_shift($treesScore);
+
+        return $this->factory($best['tree']->index);
+    }
+
+    /**
+     * @param \App\Game $game
+     * @return \App\Tree[]
+     */
+    public function filterTrees(Game $game): array
+    {
+        $growCost = $game->countGrowCost();
+
+        return array_filter(
+            $game->mine,
+            function (Tree $tree) use ($game, $growCost) {
+                if ($game->countDaysRemaining() + $tree->size < 3) {
+                    return false;
+                }
+                if ($tree->size === 0 && $growCost[0] > 3) {
+                    return false;
+                }
+                if ($tree->size >= self::MAX_LEVEL) {
+                    return false;
+                }
+                if ($tree->isDormant) {
+                    return false;
+                }
+                if ($growCost[$tree->size] > $game->me->sun) {
+                    return false;
+                }
+                return true;
+            }
+        );
+    }
+
+    public function factory(int $index): Action
+    {
+        return Action::factory(Action::TYPE_GROW, $index);
+    }
+}
+
+final class ChopStrategy extends AbstractStrategy
+{
+    public const CHOP_SIZE = 3;
+
+    public function action(Game $game): ?Action
+    {
+        if (!$this->isActive($game)) {
+            return null;
+        }
+
+        $trees = $this->filterTrees($game);
+        if ($trees === []) {
+            return null;
+        }
+
+        $treesScore = [];
+        foreach ($trees as $tree) {
+            $sunScore = $game->shadow->countSun($tree->index, $tree->size, 4);
+            if ($sunScore > 0 && $game->countDaysRemaining() > 1) {
+                continue;
+            }
+
+            $chopScore = $game->countCellScore($tree->index);
+            $treesScore[] = [
+                'tree' => $tree,
+                'score' => $chopScore,
+            ];
+        }
+        if ($treesScore === []) {
+            return null;
+        }
+
+        usort(
+            $treesScore,
+            function (array $a, array $b) use ($game) {
+                $sort = $b['score'] <=> $a['score'];
+                return $sort;
+            }
+        );
+        $best = array_shift($treesScore);
+
+        return $this->factory($best['tree']->index);
+    }
+
+    public function isActive(Game $game): bool
+    {
+        if (Game::CHOP_COST > $game->me->sun) {
+            return false;
+        }
         return true;
     }
 
+    /**
+     * @param \App\Game $game
+     * @return \App\Tree[]
+     */
     public function filterTrees(Game $game): array
     {
         return array_filter(
@@ -648,64 +719,9 @@ final class ChopStrategy extends AbstractScoreStrategy
         );
     }
 
-    public function countScore(Game $game, Tree $target): ?Score
+    public function factory(int $index): Action
     {
-        $score = 0;
-        $score += $game->field->byIndex($target->index);
-
-        if ($game->shadow->isShadow($target->index, $game->day + 1)) {
-            $score += 3;
-        }
-
-        return new Score($score, $target->index);
-    }
-
-    public function factory(Score $score): ?Action
-    {
-        return Action::factory(Action::TYPE_COMPLETE, $score->target);
-    }
-}
-
-class GrowStrategy extends AbstractScoreStrategy
-{
-    public const MAX_LEVEL = 3;
-
-    public function filterTrees(Game $game): array
-    {
-        $trees = [];
-        $size = 0;
-        foreach ($game->mine as $tree) {
-            if ($tree->size >= self::MAX_LEVEL) {
-                continue;
-            }
-            if ($tree->isDormant) {
-                continue;
-            }
-            $trees[$tree->size][] = $tree;
-            $size = max($size, $tree->size);
-        }
-
-        if ($trees === [] || $game->countGrowCost()[$size] > $game->me->sun) {
-            return [];
-        }
-
-        return $trees[$size];
-    }
-
-    public function countScore(Game $game, Tree $target): ?Score
-    {
-        $score = 0;
-        $score += $game->field->byIndex($target->index);
-
-        return new Score($score, $target->index);
-    }
-
-    public function factory(Score $score): ?Action
-    {
-        l(__CLASS__);
-        l($score->score);
-
-        return Action::factory(Action::TYPE_GROW, $score->target);
+        return Action::factory(Action::TYPE_COMPLETE, $index);
     }
 }
 
@@ -727,39 +743,75 @@ class Shadow
         return $day % 6;
     }
 
-    public function shadowVector(int $index, int $day): array
+    public function shadowVector(int $index, int $size, int $day): array
     {
-        $size = $this->game->tree($index)->size ?? 0;
-        if ($size === 0) {
-            return [];
-        }
-
         $direction = $this->sunDirection($day);
         $vector = $this->field->vector($index, $direction);
 
         return array_slice($vector, 0, $size);
     }
 
-    public function isShadow(int $index, int $day): bool
+    public function isShadow(int $index, int $size, int $day, int $interval = 0): bool
     {
-        $target = $this->game->tree($index);
-        $spooky = $target->size ?? 0;
-
         $sun = $this->sunDirection($day);
         $against = $this->field->oppositeDirection($sun);
         $vector = $this->field->vector($index, $against);
-
         foreach ($vector as $distance => $cell) {
-            $tree = $this->game->tree($cell);
-            if (!$tree || $tree->size < $distance) {
+            $neigh = $this->game->tree($cell);
+            if ($neigh === null) {
                 continue;
             }
-            if ($tree->size >= $spooky) {
+            $neighSize = min(3, $neigh->size + $interval);
+            if ($neighSize < $distance) {
+                continue;
+            }
+            if ($neighSize >= $size) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    public function countSun(int $index, int $size, int $days): int
+    {
+        $sun = 0;
+        $start = 1;
+        if ($size === 0) {
+            $start++;
+        }
+        if ($days < 1) {
+            throw new InvalidArgumentException("Expected at least 1 day.");
+        }
+
+        foreach (range($start, $days) as $interval) {
+            $day = $this->game->day + $interval;
+            if ($size < 3) {
+                $size++;
+            }
+            if (!$this->isShadow($index, $size, $day, $interval - 1)) {
+                $sun += $size;
+            }
+
+            $vector = $this->shadowVector($index, $size, $day);
+            foreach ($vector as $cell) {
+                $neigh = $this->game->tree($cell);
+                if ($neigh === null) {
+                    continue;
+                }
+                $neighSize = min(3, $neigh->size + $interval - 1);
+                if ($neighSize > $size) {
+                    continue;
+                }
+                if ($neigh->isMine) {
+                    $sun -= $neighSize;
+                } else {
+                    $sun += $neighSize;
+                }
+            }
+        }
+
+        return $sun;
     }
 }
 
@@ -769,15 +821,17 @@ if ($_ENV['APP_ENV'] !== 'prod') {
     return;
 }
 
-$_ENV['VERBOSE'] = false;
+$_ENV['VERBOSE'] = true;
 
 $field = Field::fromStream(STDIN);
+Game::fromStream(STDIN, $field);
+echo Action::factory(Action::TYPE_WAIT, 'GL HF!');
 
 $strategy = new CompositeStrategy(
     [
+        new SeedStrategy($field),
         new ChopStrategy($field),
         new GrowStrategy($field),
-        new SeedStrategy($field),
     ]
 );
 
