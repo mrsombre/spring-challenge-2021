@@ -9,7 +9,7 @@ use App\AbstractStrategy;
 use App\Game;
 use App\Action;
 
-use function Tests\makeGame;
+use function Tests\makeGameTrees;
 
 final class CompositeStrategyTest extends \PHPUnit\Framework\TestCase
 {
@@ -31,7 +31,7 @@ final class CompositeStrategyTest extends \PHPUnit\Framework\TestCase
                 },
             ]
         );
-        $game = makeGame();
+        $game = makeGameTrees();
 
         $this->assertEquals(Action::factory(), $strategy->action($game));
     }

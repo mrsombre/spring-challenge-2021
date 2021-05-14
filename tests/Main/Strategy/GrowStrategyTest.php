@@ -7,7 +7,8 @@ namespace Tests\Main\Strategy;
 use App\Action;
 use App\GrowStrategy;
 
-use function Tests\makeGame;
+use function Tests\makeField;
+use function Tests\makeGameTrees;
 
 final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
 {
@@ -26,8 +27,8 @@ final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
      */
     public function testFilter(int $expected, int $sun, array $trees)
     {
-        $strategy = new GrowStrategy();
-        $game = makeGame($trees);
+        $strategy = new GrowStrategy(makeField());
+        $game = makeGameTrees($trees);
         $game->me->sun = $sun;
 
         $this->assertCount($expected, $strategy->filterTrees($game), json_encode(func_get_args()));
@@ -36,7 +37,7 @@ final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
     public function dataMatch()
     {
         // one
-        yield [0, 99, ['0 0 1 0', '1 0 1 0']];
+        yield [29, 99, ['29 1 1 0', '32 1 1 0']];
     }
 
     /**
@@ -44,28 +45,10 @@ final class GrowStrategyTest extends \PHPUnit\Framework\TestCase
      */
     public function testMatch(int $expected, int $sun, array $trees)
     {
-        $strategy = new GrowStrategy();
-        $game = makeGame($trees);
+        $strategy = new GrowStrategy(makeField());
+        $game = makeGameTrees($trees);
         $game->me->sun = $sun;
 
         $this->assertEquals(Action::factory(Action::TYPE_GROW, $expected), $strategy->action($game), json_encode(func_get_args()));
-    }
-
-    public function dataScore()
-    {
-        yield [1, 3, ['0 0 1 0', '1 1 1 0']];
-        yield [1, 7, ['0 1 1 0', '1 2 1 0']];
-    }
-
-    /**
-     * @dataProvider dataScore
-     */
-    public function testScore(int $expected, int $sun, array $trees)
-    {
-        $strategy = new GrowStrategy();
-        $game = makeGame($trees);
-        $game->me->sun = $sun;
-
-        $this->assertSame($expected, $strategy->action($game)->params[0], json_encode(func_get_args()));
     }
 }

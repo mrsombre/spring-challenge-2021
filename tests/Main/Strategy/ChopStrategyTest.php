@@ -7,7 +7,7 @@ namespace Tests\Main\Strategy;
 use App\ChopStrategy;
 
 use function Tests\makeField;
-use function Tests\makeGame;
+use function Tests\makeGameTrees;
 
 final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
 {
@@ -22,7 +22,7 @@ final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
      */
     public function testIsActive(int $sun, array $trees)
     {
-        $game = makeGame($trees);
+        $game = makeGameTrees($trees);
         $game->me->sun = $sun;
         $strategy = new ChopStrategy($game);
 
@@ -44,7 +44,7 @@ final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
      */
     public function testFilter(int $expected, array $trees)
     {
-        $game = makeGame($trees);
+        $game = makeGameTrees($trees);
         $strategy = new ChopStrategy($game);
 
         $this->assertCount($expected, $strategy->filterTrees($game), json_encode(func_get_args()));
@@ -60,7 +60,7 @@ final class ChopStrategyTest extends \PHPUnit\Framework\TestCase
      */
     public function testScore($expected, int $index, array $trees)
     {
-        $game = makeGame($trees);
+        $game = makeGameTrees($trees);
         $game->me->sun = 4;
         $strategy = new ChopStrategy($game);
 

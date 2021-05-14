@@ -8,7 +8,6 @@ use App\Field;
 use App\Game;
 use App\Player;
 use App\Tree;
-use App\Action;
 
 function streamFromString(string $string)
 {
@@ -30,10 +29,19 @@ function makeField(string $file = null): Field
     return Field::fromStream($stream);
 }
 
-function makeGame(array $treesData = []): Game
+function makeGame(string $file = null): Game
 {
-    $field = makeField();
+    if ($file === null) {
+        $file = __DIR__ . '/fixtures/game.txt';
+    }
+    $fixture = file_get_contents($file);
+    $stream = streamFromString($fixture);
 
+    return Game::fromStream($stream);
+}
+
+function makeGameTrees(array $treesData = []): Game
+{
     $trees = [];
     foreach ($treesData as $tree) {
         if (is_string($tree)) {
@@ -49,7 +57,6 @@ function makeGame(array $treesData = []): Game
     }
 
     return new Game(
-        $field,
         0,
         20,
         Player::factory(),
@@ -57,17 +64,4 @@ function makeGame(array $treesData = []): Game
         $trees,
         []
     );
-}
-
-/**
- * @param array $actionsData
- * @return \App\Action[]
- */
-function makeActions(array $actionsData): array
-{
-    $actions = [];
-    foreach ($actionsData as $datum) {
-        $actions[] = Action::factory(...sscanf($datum, '%s %d %d'));
-    }
-    return $actions;
 }

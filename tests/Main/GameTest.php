@@ -5,20 +5,17 @@ declare(strict_types=1);
 namespace Tests\Main;
 
 use App\Game;
-use App\Action;
 
-use function Tests\makeField;
 use function Tests\streamFromString;
-use function Tests\makeGame;
+use function Tests\makeGameTrees;
 
 final class GameTest extends \PHPUnit\Framework\TestCase
 {
     public function testFactory()
     {
-        $field = makeField();
-        $fixture = file_get_contents(__DIR__ . '/../fixtures/step.txt');
+        $fixture = file_get_contents(__DIR__ . '/../fixtures/game.txt');
         $stream = streamFromString($fixture);
-        $game = Game::fromStream($stream, $field);
+        $game = Game::fromStream($stream);
 
         $this->assertSame(0, $game->day);
         $this->assertSame(20, $game->nutrients);
@@ -44,6 +41,21 @@ final class GameTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals('COMPLETE 22', $game->actions[1]);
     }
 
+    public function dataCountTreesBySize()
+    {
+        yield [[0 => 1, 1 => 0, 2 => 0, 3 => 0], ['0 0 1 0']];
+    }
+
+    /**
+     * @dataProvider dataCountTreesBySize
+     */
+    public function testCountTreesBySize(array $expected, array $trees)
+    {
+        $game = makeGameTrees($trees);
+
+        $this->assertSame($expected, $game->countTreesBySize());
+    }
+
     public function dataCountGrowCost()
     {
         // size 0
@@ -64,9 +76,30 @@ final class GameTest extends \PHPUnit\Framework\TestCase
      */
     public function testCountGrowCost(int $expected, int $size, array $trees)
     {
-        $game = makeGame($trees);
+        $game = makeGameTrees($trees);
 
         $this->assertSame($expected, $game->countGrowCost()[$size], json_encode(func_get_args()));
+    }
+
+    public function dataSunCost()
+    {
+        // size 0
+        yield [0.99, 1.01, 0, ['0 0 1 0']];
+        // size 1
+        yield [1.49, 1.51, 1, ['0 1 1 0']];
+        // size 2
+        yield [2.32, 2.34, 2, ['0 2 1 0']];
+    }
+
+    /**
+     * @dataProvider dataSunCost
+     */
+    public function testSunCost($min, $max, int $size, array $trees)
+    {
+        $game = makeGameTrees($trees);
+
+        $this->assertTrue(($min <= $game->countSunCost()[$size]), json_encode(func_get_args()));
+        $this->assertTrue(($max >= $game->countSunCost()[$size]), json_encode(func_get_args()));
     }
 
     public function dataCountSeedCost()
@@ -80,23 +113,8 @@ final class GameTest extends \PHPUnit\Framework\TestCase
      */
     public function testCountSeedCost(int $expected, array $trees)
     {
-        $game = makeGame($trees);
+        $game = makeGameTrees($trees);
 
         $this->assertSame($expected, $game->countSeedCost(), json_encode(func_get_args()));
-    }
-
-    public function dataCountTreesBySize()
-    {
-        yield [[0 => 1, 1 => 0, 2 => 0, 3 => 0], ['0 0 1 0']];
-    }
-
-    /**
-     * @dataProvider dataCountTreesBySize
-     */
-    public function testCountTreesBySize(array $expected, array $trees)
-    {
-        $game = makeGame($trees);
-
-        $this->assertSame($expected, $game->countTreesBySize());
     }
 }

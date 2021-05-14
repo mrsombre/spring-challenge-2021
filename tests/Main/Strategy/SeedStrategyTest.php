@@ -6,7 +6,7 @@ namespace Tests\Main\Strategy;
 
 use App\SeedStrategy;
 
-use function Tests\makeGame;
+use function Tests\makeGameTrees;
 
 final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
 {
@@ -23,7 +23,7 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
     public function testIsActive(bool $expected, array $trees)
     {
         $strategy = new SeedStrategy();
-        $game = makeGame($trees);
+        $game = makeGameTrees($trees);
 
         $this->assertSame($expected, $strategy->isActive($game), json_encode(func_get_args()));
     }
@@ -43,7 +43,7 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
      */
     public function testFilter(int $expected, array $trees)
     {
-        $game = makeGame($trees);
+        $game = makeGameTrees($trees);
         $strategy = new SeedStrategy($game);
 
         $this->assertCount($expected, $strategy->filterTrees($game), json_encode(func_get_args()));
@@ -60,7 +60,7 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
     public function testMatch(array $expected, array $trees)
     {
         $strategy = new SeedStrategy();
-        $game = makeGame($trees);
+        $game = makeGameTrees($trees);
 
         $this->assertSame($expected, $strategy->action($game)->params, json_encode(func_get_args()));
     }
@@ -76,7 +76,7 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
     public function testCellScore(int $expected, int $index, int $day, array $trees)
     {
         $strategy = new SeedStrategy();
-        $game = makeGame($trees);
+        $game = makeGameTrees($trees);
 
         $this->assertSame($expected, $strategy->countCellScore($game, $index), json_encode(func_get_args()));
     }
@@ -84,7 +84,7 @@ final class SeedStrategyTest extends \PHPUnit\Framework\TestCase
     public function testFindCells()
     {
         $strategy = new SeedStrategy();
-        $game = makeGame(['0 3 0 0', '1 0 0 0', '2 2 0 0']);
+        $game = makeGameTrees(['0 3 0 0', '1 0 0 0', '2 2 0 0']);
         $game->field->cells[5] = 0;
 
         $cells = $strategy->findCells($game, $game->tree(0));
