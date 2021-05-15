@@ -350,6 +350,28 @@ final class Game
         return $rich + $this->nutrients;
     }
 
+    public function oppPessimisticSize(Tree $tree, array $growCost): int
+    {
+        $size = $tree->size;
+        // already big
+        if ($size === 3) {
+            return $size;
+        }
+        // is waiting
+        if ($this->opp->isWaiting) {
+            return $size;
+        }
+        // dormant
+        if ($tree->isDormant) {
+            return $size;
+        }
+        // no sun
+        if ($this->opp->sun < $growCost[$size]) {
+            return $size;
+        }
+        return $size + 1;
+    }
+
     public function export(): string
     {
         $result = [$this->day];
@@ -526,14 +548,40 @@ final class SeedStrategy extends AbstractStrategy
         }
 
         $shadow = new Shadow($this->field);
+        $daysRemaining = $game->countDaysRemaining();
         $cellsScore = [];
-        foreach ($cells as $index) {
-            $countSun = $shadow->countSun($game->trees, $index, $game->day, 6);
-            $countCellScore = $game->countCellScore($this->field->byIndex($index));
+        foreach ($cells as $cell) {
+            $sunBalance = 0;
+
+            if ($daysRemaining > 6) {
+                $start = $game->day + 5;
+                foreach (range($start, $start + min(5, $daysRemaining)) as $day) {
+                    if ($shadow->isShadow($game->trees, $cell, 1, $day)) {
+                        $sunBalance--;
+                    }
+
+                    $shadowOut = $shadow->shadowOut($cell, $day);
+                    foreach ($shadowOut as $outCell) {
+                        $neigh = $game->tree($outCell);
+                        if ($neigh === null) {
+                            continue;
+                        }
+
+                        if ($neigh->isMine) {
+                            $sunBalance -= 1;
+                        } else {
+                            $sunBalance += 0.5;
+                        }
+                    }
+                }
+            }
+
+            $score = $game->countCellScore($this->field->byIndex($cell));
+
             $cellsScore[] = [
-                'index' => $index,
-                'sun' => $countSun,
-                'cell' => $countCellScore,
+                'index' => $cell,
+                'shadow' => $sunBalance,
+                'score' => $score,
             ];
         }
         if ($cellsScore === []) {
@@ -542,10 +590,10 @@ final class SeedStrategy extends AbstractStrategy
 
         usort(
             $cellsScore,
-            function (array $a, array $b) {
-                $sort = $b['sun'] <=> $a['sun'];
+            function (array $a, array $b) use ($game) {
+                $sort = $b['shadow'] <=> $a['shadow'];
                 if ($sort === 0) {
-                    $sort = $b['cell'] <=> $a['cell'];
+                    $sort = $b['score'] <=> $a['score'];
                 }
                 return $sort;
             }
@@ -639,78 +687,113 @@ class GrowStrategy extends AbstractStrategy
             return null;
         }
 
-        $bySize = [];
+        $bySize = array_fill_keys(Tree::SIZE, 0);
         foreach ($trees as $tree) {
-            $bySize[$tree->size][$tree->index] = $tree;
+            $bySize[$tree->size]++;
         }
 
+        $shadow = new Shadow($this->field);
         $growCost = $game->countGrowCost();
         $bestSize = null;
-        // count 2
-        if (isset($bySize[1]) && ($growCost[1] + 1 <= 7)) {
-            $bestSize = 1;
-        } elseif (isset($bySize[0]) && $growCost[0] <= 2) {
-            $bestSize = 0;
-        } elseif (isset($bySize[2])) {
+
+        // choose size 3
+        if ((function () use ($game, $growCost, $bySize) {
+            if ($game->countDaysRemaining() > 6) {
+                return false;
+            }
+            if ($bySize[2] < 1) {
+                return false;
+            }
+            return true;
+        })()) {
             $bestSize = 2;
         }
-        if ($bestSize === null) {
-            $sizeScore = [];
-            foreach ($growCost as $size => $cost) {
-                $sizeScore[] = [
-                    'size' => $size,
-                    'cost' => $cost,
-                ];
+
+        // choose size 2
+        if ((function () use ($game, $growCost, $bySize) {
+            if ($bySize[1] < 1) {
+                return false;
             }
-            uasort(
-                $sizeScore,
-                function (array $a, array $b) {
-                    $sort = $a['cost'] <=> $b['cost'];
-                    if ($sort === 0) {
-                        $sort = $b['size'] <=> $a['size'];
-                    }
-                    return $sort;
-                }
-            );
-            $bestSize = array_shift($sizeScore)['size'];
+            $cost2 = $growCost[1] + $growCost[0] - 1;
+            if ($cost2 > $game->me->sun) {
+                return false;
+            }
+            $cost3 = $growCost[2];
+            if ($cost2 >= $cost3) {
+                return false;
+            }
+            return true;
+        })()) {
+            $bestSize = 1;
         }
 
-        $oppGrowCost = $game->countGrowCost(false);
-        $shadow = new Shadow($this->field);
-        $treesScore = [];
-        foreach ($bySize[$bestSize] as $tree) {
-            /** @var \App\Tree $tree */
-            $sun = $shadow->countSun($game->trees, $tree->index, $game->day);
-
-            $shadowOut = $shadow->shadowOut($tree->index, $game->day + 1);
-            $shadowOut = array_slice($shadowOut, 0, $tree->size + 1);
-            foreach ($shadowOut as $index) {
-                $inShadow = $game->tree($index);
-                if ($inShadow === null) {
-                    continue;
+        if ($bestSize === null) {
+            foreach (range(2, 0, -1) as $size) {
+                if ($bySize[$size] > 0 && $growCost[$size] <= $game->me->sun) {
+                    $bestSize = $size;
+                    break;
                 }
-                $size = $inShadow->size;
-                // tree can grow
-                if (!$inShadow->isDormant && $size < 3) {
-                    $ghc = $inShadow->isMine ? $growCost[$size] : $oppGrowCost[$size];
-                    $ghp = $inShadow->isMine ? $game->me->sun : $game->opp->sun;
-                    if ($ghc <= $ghp) {
-                        $size++;
+            }
+        }
+
+        $sizeUp = $bestSize + 1;
+        $oppGrowCost = $game->countGrowCost(false);
+        $treesScore = [];
+        foreach ($trees as $tree) {
+            if ($tree->size !== $bestSize) {
+                continue;
+            }
+
+            $sunBalance = $sizeUp;
+
+            if ($game->countDaysRemaining() > 6) {
+                $shadowIn = $shadow->shadowIn($tree->index, $game->day + 1);
+                foreach ($shadowIn as $distance => $cell) {
+                    $neigh = $game->tree($cell);
+                    if ($neigh === null) {
+                        continue;
+                    }
+                    if ($neigh->isMine) {
+                        if ($distance <= $neigh->size && $neigh->size >= $sizeUp) {
+                            $sunBalance = 0;
+                            break;
+                        }
+                    } else {
+                        $oppSize = $game->oppPessimisticSize($neigh, $oppGrowCost);
+                        if ($distance <= $oppSize && $oppSize <= $sizeUp) {
+                            $sunBalance = 0;
+                            break;
+                        }
                     }
                 }
-                if ($size <= $tree->size) {
-                    $ghs = $shadow->countSun($game->trees, $inShadow->index, $game->day + 1);;
-                    if ($tree->isMine) {
-                        $sun -= $ghs;
+
+                $shadowOut = $shadow->shadowOut($tree->index, $game->day + 1);
+                $shadowOut = array_slice($shadowOut, 0, $sizeUp);
+                foreach ($shadowOut as $index) {
+                    $neigh = $game->tree($index);
+                    if ($neigh === null) {
+                        continue;
+                    }
+                    if ($neigh->isMine) {
+                        if ($neigh->size <= $sizeUp) {
+                            $sunBalance -= $neigh->size;
+                            continue;
+                        }
                     } else {
-                        $sun += $ghs * 0.5;
+                        $oppSize = $game->oppPessimisticSize($neigh, $oppGrowCost);
+                        if ($oppSize <= $sizeUp) {
+                            $sunBalance += $neigh->size;
+                        }
                     }
                 }
             }
+
+            $score = $game->countCellScore($this->field->byIndex($tree->index));
 
             $treesScore[] = [
                 'tree' => $tree,
-                'sun' => $sun,
+                'shadow' => $sunBalance,
+                'score' => $score,
             ];
         }
         if ($treesScore === []) {
@@ -720,7 +803,10 @@ class GrowStrategy extends AbstractStrategy
         usort(
             $treesScore,
             function (array $a, array $b) {
-                $sort = $b['sun'] <=> $a['sun'];
+                $sort = $b['shadow'] <=> $a['shadow'];
+                if ($sort === 0) {
+                    $sort = $b['score'] <=> $a['score'];
+                }
                 return $sort;
             }
         );
@@ -731,6 +817,11 @@ class GrowStrategy extends AbstractStrategy
 
     public function isActive(Game $game): bool
     {
+        $bySize = $game->countTreesBySize();
+        if ($bySize[3] > 3) {
+            return false;
+        }
+
         return true;
     }
 
@@ -754,6 +845,14 @@ class GrowStrategy extends AbstractStrategy
                 if ($growCost[$tree->size] > $game->me->sun) {
                     return false;
                 }
+
+                if ($tree->size > 0 && $game->countDaysRemaining() === 0) {
+                    return false;
+                }
+                if ($tree->size > 1 && $game->countDaysRemaining() === 1) {
+                    return false;
+                }
+
                 return true;
             }
         );
@@ -780,25 +879,48 @@ final class ChopStrategy extends AbstractStrategy
             return null;
         }
 
-        $bySize = $game->countTreesBySize();
-        if ($bySize[self::CHOP_SIZE] > count($trees)) {
-            return null;
-        }
-
         $shadow = new Shadow($this->field);
+        $oppGrowCost = $game->countGrowCost(false);
         $treesScore = [];
         foreach ($trees as $tree) {
-            $sunScore = $shadow->countSun($game->trees, $tree->index, $game->day);
-            $sunScore += $shadow->countShadows($game->trees, $tree->index, $game->day + 1);
-            if ($sunScore > 3) {
-                continue;
+            $cellScore = $game->countCellScore($this->field->byIndex($tree->index));
+
+            $sunBalance = 3;
+            $shadowIn = $shadow->shadowIn($tree->index, $game->day + 1);
+            foreach ($shadowIn as $distance => $cell) {
+                $neigh = $game->tree($cell);
+                if ($neigh === null) {
+                    continue;
+                }
+                if ($neigh->isMine && $neigh->size === 3) {
+                    $sunBalance = 0;
+                    break;
+                } else {
+                    $oppSize = $game->oppPessimisticSize($neigh, $oppGrowCost);
+                    if ($oppSize === 3) {
+                        $sunBalance = 0;
+                        break;
+                    }
+                }
             }
 
-            $cellScore = $game->countCellScore($tree->index);
+            $shadowOut = $shadow->shadowOut($tree->index, $game->day + 1);
+            foreach ($shadowOut as $index) {
+                $neigh = $game->tree($index);
+                if ($neigh === null) {
+                    continue;
+                }
+                if ($neigh->isMine && $neigh->size <= 3) {
+                    $sunBalance -= $neigh->size;
+                } else {
+                    $sunBalance += $neigh->size;
+                }
+            }
+
             $treesScore[] = [
                 'tree' => $tree,
-                'sunScore' => $sunScore,
                 'cellScore' => $cellScore,
+                'sunBalance' => $sunBalance,
             ];
         }
         if ($treesScore === []) {
@@ -808,9 +930,9 @@ final class ChopStrategy extends AbstractStrategy
         usort(
             $treesScore,
             function (array $a, array $b) use ($game) {
-                $sort = $b['sunScore'] <=> $a['sunScore'];
+                $sort = $b['cellScore'] <=> $a['cellScore'];
                 if ($sort === 0) {
-                    $sort = $b['cellScore'] <=> $a['cellScore'];
+                    $sort = $b['sunBalance'] <=> $a['sunBalance'];
                 }
                 return $sort;
             }
@@ -826,19 +948,12 @@ final class ChopStrategy extends AbstractStrategy
             return false;
         }
 
-        if ($game->countDaysRemaining() < 2) {
+        if ($game->countDaysRemaining() < 5) {
             return true;
         }
 
-        if ($game->nutrients < 10) {
-            return true;
-        }
-
-        if ($game->countTreesBySize(false)[self::CHOP_SIZE] > 3) {
-            return true;
-        }
-
-        if ($game->countTreesBySize()[self::CHOP_SIZE] < 4) {
+        $bySize = $game->countTreesBySize();
+        if ($bySize[self::CHOP_SIZE] < 4) {
             return false;
         }
 
@@ -990,8 +1105,8 @@ echo Action::factory(Action::TYPE_WAIT, 'GL HF!');
 
 $strategy = new CompositeStrategy(
     new ChopStrategy($field),
-    new GrowStrategy($field),
     new SeedStrategy($field),
+    new GrowStrategy($field),
 );
 
 while (true) {

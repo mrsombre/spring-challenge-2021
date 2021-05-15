@@ -33,8 +33,8 @@ foreach (range($game->day, 22) as $day) {
 
         $strategy = new CompositeStrategy(
             new ChopStrategy($field),
-            new GrowStrategy($field),
             new SeedStrategy($field),
+            new GrowStrategy($field),
         );
         $action = $strategy->action($game);
 
@@ -74,7 +74,7 @@ foreach (range($game->day, 22) as $day) {
     }
 }
 
-echo "---\n";
+echo "xxx\n";
 
 $game = Game::fromStream(streamFromString($game->export()));
 $trees = json_encode($game->countTreesBySize());

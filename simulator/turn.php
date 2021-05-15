@@ -14,8 +14,8 @@ $game = makeGame(__DIR__ . '/game/test.txt');
 
 $strategy = new \App\CompositeStrategy(
     new ChopStrategy($field),
-    new GrowStrategy($field),
     new SeedStrategy($field),
+    new GrowStrategy($field),
 );
 $action = $strategy->action($game);
 
