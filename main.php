@@ -335,16 +335,6 @@ final class Game
         ];
     }
 
-    public function countSunCost(bool $isMine = true): array
-    {
-        $bySize = $this->countGrowCost($isMine);
-        return [
-            ceil($bySize[0] / 1),
-            ceil($bySize[1] / 2),
-            ceil($bySize[2] / 3),
-        ];
-    }
-
     public function countSeedCost(bool $isMine = true): int
     {
         return self::SEED_COST + $this->countTreesBySize($isMine)[0];
@@ -649,43 +639,41 @@ class GrowStrategy extends AbstractStrategy
             return null;
         }
 
-        $growCost = $game->countGrowCost();
         $bySize = [];
         foreach ($trees as $tree) {
             $bySize[$tree->size][$tree->index] = $tree;
         }
 
-        $sunCost = $game->countSunCost();
-        $sizeScore = [];
-        foreach ($sunCost as $size => $cost) {
-            if (!isset($bySize[$size])) {
-                continue;
-            }
-            if ($growCost[$size] > $game->me->sun) {
-                continue;
-            }
-
-            $sizeScore[] = [
-                'size' => $size,
-                'cost' => $cost,
-                'trees' => $bySize[$size],
-            ];
+        $growCost = $game->countGrowCost();
+        $bestSize = null;
+        // count 2
+        if (isset($bySize[1]) && ($growCost[1] + 1 <= 7)) {
+            $bestSize = 1;
+        } elseif (isset($bySize[0]) && $growCost[0] <= 2) {
+            $bestSize = 0;
+        } elseif (isset($bySize[2])) {
+            $bestSize = 2;
         }
-        if ($sizeScore === []) {
-            return null;
-        }
-
-        uasort(
-            $sizeScore,
-            function (array $a, array $b) {
-                $sort = $a['cost'] <=> $b['cost'];
-                if ($sort === 0) {
-                    $sort = $a['trees'] <=> $b['trees'];
+        if ($bestSize === null) {
+            $sizeScore = [];
+            foreach ($growCost as $size => $cost) {
+                $sizeScore[] = [
+                    'size' => $size,
+                    'cost' => $cost,
+                ];
+            }
+            uasort(
+                $sizeScore,
+                function (array $a, array $b) {
+                    $sort = $a['cost'] <=> $b['cost'];
+                    if ($sort === 0) {
+                        $sort = $b['size'] <=> $a['size'];
+                    }
+                    return $sort;
                 }
-                return $sort;
-            }
-        );
-        $bestSize = array_shift($sizeScore)['size'];
+            );
+            $bestSize = array_shift($sizeScore)['size'];
+        }
 
         $oppGrowCost = $game->countGrowCost(false);
         $shadow = new Shadow($this->field);
@@ -752,38 +740,20 @@ class GrowStrategy extends AbstractStrategy
      */
     public function filterTrees(Game $game): array
     {
-        $bySize = $game->countTreesBySize();
+        $growCost = $game->countGrowCost();
 
         return array_filter(
             $game->mine,
-            function (Tree $tree) use ($game, $bySize) {
+            function (Tree $tree) use ($game, $growCost) {
                 if ($tree->size === self::MAX_LEVEL) {
                     return false;
                 }
                 if ($tree->isDormant) {
                     return false;
                 }
-
-                if ($tree->size === 0) {
-                    if ($game->countDaysRemaining() < 4 && $bySize[0] > 0) {
-                        return false;
-                    }
-                    if ($bySize[1] >= 2) {
-                        return false;
-                    }
-                    return true;
+                if ($growCost[$tree->size] > $game->me->sun) {
+                    return false;
                 }
-
-                if ($tree->size === 1) {
-                    if ($game->countDaysRemaining() < 3 && $bySize[1] > 0) {
-                        return false;
-                    }
-                    if ($bySize[2] >= 4) {
-                        return false;
-                    }
-                    return true;
-                }
-
                 return true;
             }
         );

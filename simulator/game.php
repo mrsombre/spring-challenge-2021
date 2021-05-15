@@ -14,7 +14,7 @@ use function Tests\streamFromString;
 
 require_once __DIR__ . '/../tests/bootstrap.php';
 
-$field = makeField(__DIR__ . '/field.txt');
+$field = makeField(__DIR__ . '/game/field.txt');
 $game = makeGame(__DIR__ . '/game/common.txt');
 
 foreach (range($game->day, 22) as $day) {
