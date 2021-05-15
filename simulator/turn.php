@@ -1,6 +1,6 @@
 <?php
 
-use App\Shadow;
+use App\GrowStrategy;
 use App\SeedStrategy;
 use App\ChopStrategy;
 
@@ -12,7 +12,11 @@ require_once __DIR__ . '/../tests/bootstrap.php';
 $field = makeField(__DIR__ . '/field.txt');
 $game = makeGame(__DIR__ . '/game/test.txt');
 
-$strategy = new ChopStrategy($field);
+$strategy = new \App\CompositeStrategy(
+    new ChopStrategy($field),
+    new GrowStrategy($field),
+    new SeedStrategy($field),
+);
 $action = $strategy->action($game);
 
 print_r($action);
