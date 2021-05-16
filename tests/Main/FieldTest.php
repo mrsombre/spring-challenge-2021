@@ -15,7 +15,8 @@ final class FieldTest extends \PHPUnit\Framework\TestCase
     {
         $fixture = file_get_contents(__DIR__ . '/../fixtures/field.txt');
         $stream = streamFromString($fixture);
-        $field = Field::fromStream($stream);
+        $fieldData = Field::fromStream($stream);
+        $field = new Field($fieldData);
 
         $this->assertCount(37, $field->cells);
         $this->assertSame(3, $field->byIndex(0));
@@ -29,12 +30,11 @@ final class FieldTest extends \PHPUnit\Framework\TestCase
 
     public function testOppositeDirection()
     {
-        $field = makeField();
         $directions = [0, 1, 2, 3, 4, 5];
         $expected = [3, 4, 5, 0, 1, 2];
 
         foreach ($directions as $key => $direction) {
-            $this->assertSame($expected[$key], $field->oppositeDirection($direction));
+            $this->assertSame($expected[$key], Field::oppositeDirection($direction));
         }
     }
 

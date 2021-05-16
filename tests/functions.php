@@ -26,10 +26,10 @@ function makeField(string $file = null): Field
     $fixture = file_get_contents($file);
     $stream = streamFromString($fixture);
 
-    return Field::fromStream($stream);
+    return new Field(Field::fromStream($stream));
 }
 
-function makeGame(string $file = null): Game
+function makeGame(string $file = null, Field $field = null): Game
 {
     if ($file === null) {
         $file = __DIR__ . '/fixtures/game.txt';
@@ -37,7 +37,11 @@ function makeGame(string $file = null): Game
     $fixture = file_get_contents($file);
     $stream = streamFromString($fixture);
 
-    return Game::fromStream($stream);
+    if ($field === null) {
+        $field = makeField();
+    }
+
+    return new Game($field, ...Game::fromStream($stream));
 }
 
 function makeGameTrees(array $treesData = []): Game
